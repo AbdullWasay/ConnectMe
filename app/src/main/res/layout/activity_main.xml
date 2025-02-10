@@ -12,7 +12,6 @@
         android:layout_height="400dp"
         android:importantForAccessibility="no"
         android:src="@drawable/connectme"
-        android:scaleType="centerInside"
         android:layout_centerHorizontal="true"
         android:layout_centerVertical="true"
         />

@@ -3,6 +3,9 @@
     <style name="Base.Theme.ConnectMe" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">#59442F</item>
+
+
     </style>
 
     <style name="Theme.ConnectMe" parent="Base.Theme.ConnectMe" />

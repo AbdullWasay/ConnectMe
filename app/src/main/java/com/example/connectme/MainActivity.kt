@@ -12,11 +12,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Show Screen1 for 3 seconds
         setContentView(R.layout.activity_main) // Screen 1 layout
 
         Handler(Looper.getMainLooper()).postDelayed({
-            showScreen2() // Navigate to Screen 2
+            showScreen2()
         }, 3000)
     }
 

@@ -1,0 +1,113 @@
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#DFDFDF"
+        android:padding="16dp">
+
+        <!-- User Name -->
+        <TextView
+            android:id="@+id/tvUserName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Henry Benjamin"
+            android:textSize="22sp"
+            android:layout_marginTop="20dp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="8dp"/>
+
+
+
+        <!-- Call Duration -->
+        <TextView
+            android:id="@+id/tvCallDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="10:32"
+            android:textSize="21sp"
+            android:layout_weight="1"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="150dp"/>
+
+
+    <ImageView
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:src="@drawable/rounded_rectangle"
+        android:layout_gravity="end"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Bottom Control Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:background="@drawable/messagetypingbox"
+            android:gravity="center"
+            android:paddingHorizontal="24dp"
+            android:orientation="horizontal"
+            android:layout_gravity="bottom">
+
+            <!-- More Options -->
+            <ImageView
+                android:id="@+id/btnMoreOptions"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:src="@drawable/more_icon"
+                android:scaleType="fitCenter"
+                android:clipToOutline="true"
+                android:background="@drawable/screen8_circle_shape"
+                android:padding="10dp"
+                android:layout_marginEnd="16dp"/>
+
+            <!-- Video Toggle -->
+            <ImageView
+                android:id="@+id/btnVideoToggle"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/whitevideocall_icon"
+                android:background="@drawable/screen8_circle_shape"
+                android:padding="10dp"
+                android:layout_marginEnd="16dp"/>
+
+            <!-- Speaker Toggle -->
+            <ImageView
+                android:id="@+id/btnSpeakerToggle"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:src="@drawable/speaker_icon"
+                android:background="@drawable/screen8_circle_shape"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:layout_marginEnd="16dp"/>
+
+            <!-- Mute Toggle -->
+            <ImageView
+                android:id="@+id/btnMuteToggle"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:src="@drawable/mute_icon"
+                android:background="@drawable/screen8_circle_shape"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:layout_marginEnd="16dp"/>
+
+            <!-- End Call -->
+            <ImageView
+                android:id="@+id/btnEndCall"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:src="@drawable/phone_icon"
+                android:backgroundTint="#D60000"
+                android:scaleType="fitCenter"
+                android:background="@drawable/screen8_circle_shape"
+                android:padding="10dp"
+                />
+        </LinearLayout>
+
+
+    </LinearLayout>

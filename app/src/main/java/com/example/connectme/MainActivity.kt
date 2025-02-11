@@ -4,6 +4,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
@@ -45,8 +47,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScreen4() {
-        setContentView(R.layout.screen4) // Screen 3 layout
+        setContentView(R.layout.screen4) // Screen 4 layout
 
+        val messagesButton = findViewById<ImageButton>(R.id.MessagesButtonm)
+        messagesButton.setOnClickListener {
+            showScreen5()
+        }
+    }
 
+    private fun showScreen5() {
+        setContentView(R.layout.screen5) // Screen 5 layout
+
+        val backButton = findViewById<ImageView>(R.id.BackButtonm)
+        backButton.setOnClickListener {
+            showScreen4()
+        }
     }
 }

@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FDF7F3"
+    android:padding="16dp"
+    >
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
+
+        <!-- Back Button -->
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/back_icon"/>
+
+        <!-- User Name -->
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Henry Benjamin"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginLeft="12dp"
+            android:textColor="@android:color/black"
+           />
+
+        <!-- Call & Video Icons -->
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/call_icon"
+            android:layout_marginEnd="12dp"/>
+
+        <ImageView
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/videocall_icon"
+           />
+    </LinearLayout>
+
+    <!-- Profile Picture -->
+    <ImageView
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:src="@drawable/profilepic3"
+        android:layout_gravity="center"
+        android:layout_marginTop="16dp"
+        android:scaleType="centerCrop"
+        android:clipToOutline="true"
+
+        android:background="@drawable/story_circle"/>
+
+    <!-- View Profile Button -->
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+android:layout_marginTop="10dp"
+
+        >
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="30dp"
+        android:text="View Profile"
+        android:layout_centerHorizontal="true"
+        android:background="@drawable/viewprofile_button"
+        android:textColor="@android:color/black"
+        android:layout_gravity="center"
+        android:foreground="#CDC7C1"
+        android:clipToOutline="true"
+        android:layout_marginTop="8dp"/>
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_centerInParent="true"
+    android:text="View Profile"
+    android:paddingTop="6dp"
+    android:textStyle="bold"/>
+    </RelativeLayout>
+
+
+
+    <!-- Chat Section -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingVertical="12dp"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+android:layout_marginTop="180dp"
+            android:orientation="vertical">
+
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                >
+            <!-- Chat Bubbles -->
+            <LinearLayout
+                android:id="@+id/message1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/viewprofile_button"
+                android:padding="12dp">
+
+                <TextView
+
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hello, How are you?"
+                    android:textSize="14sp"
+                    android:textColor="@android:color/black"/>
+            </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/message1"
+                    android:textSize="12dp"
+                    android:layout_alignRight="@id/message1"
+
+                    android:text="10:30" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                >
+                <!-- Chat Bubbles -->
+                <LinearLayout
+                    android:id="@+id/message2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/viewprofile_button"
+                    android:padding="12dp">
+
+                    <TextView
+
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Hi, I am great, Wbu?"
+                        android:textSize="14sp"
+                        android:textColor="@android:color/black"/>
+                </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10:32"
+                    android:textSize="12dp"
+                    android:layout_below="@+id/message2"
+                    android:layout_alignLeft="@id/message2"
+                    />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                >
+                <!-- Chat Bubbles -->
+                <LinearLayout
+                    android:id="@+id/message3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/viewprofile_button"
+                    android:padding="12dp">
+
+                    <TextView
+
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="I am doing well"
+                        android:textSize="14sp"
+                        android:textColor="@android:color/black"/>
+                </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1:30"
+                    android:textSize="12dp"
+                    android:layout_below="@+id/message3"
+                    android:layout_alignRight="@id/message3"
+                    />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                >
+                <!-- Chat Bubbles -->
+                <LinearLayout
+                    android:id="@+id/message4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/viewprofile_button"
+                    android:padding="12dp">
+
+                    <TextView
+
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Good to know"
+                        android:textSize="14sp"
+                        android:textColor="@android:color/black"/>
+                </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="10:30"
+                    android:textSize="12dp"
+                    android:layout_below="@+id/message4"
+                    android:layout_alignLeft="@id/message4"
+                    />
+
+            </RelativeLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Typing Box -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:orientation="horizontal"
+        android:background="@drawable/messagetypingbox"
+        android:paddingHorizontal="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Typing..."
+            android:textSize="14sp"
+            android:textColor="@android:color/white"/>
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/messagesend_icon"/>
+    </LinearLayout>
+
+</LinearLayout>

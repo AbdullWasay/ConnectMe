@@ -2,5 +2,8 @@
     <string name="app_name">ConnectMe</string>
     <string name="terms_of_service"><u>Terms of Service</u></string>
     <string name="privacy_policy"><u>Privacy Policy</u></string>
+    <string name="postcaption1"><b>Emily James</b> Had a great hike across this beautiful landscape! 🖤🌲</string>
+    <string name="postcaption2"><b>Kadin Bergson</b> Enjoying a sunny beach day! ☀️🏖️</string>
+
 
 </resources>

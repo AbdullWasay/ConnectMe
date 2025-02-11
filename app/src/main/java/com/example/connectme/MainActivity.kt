@@ -26,6 +26,11 @@ class MainActivity : AppCompatActivity() {
         registerText.setOnClickListener {
             showScreen3()
         }
+
+        val loginText = findViewById<TextView>(R.id.loginButton)
+        loginText.setOnClickListener {
+            showScreen4()
+        }
     }
 
     private fun showScreen3() {
@@ -35,5 +40,13 @@ class MainActivity : AppCompatActivity() {
         loginText.setOnClickListener {
             showScreen2()
         }
+
+
+    }
+
+    private fun showScreen4() {
+        setContentView(R.layout.screen4) // Screen 3 layout
+
+
     }
 }

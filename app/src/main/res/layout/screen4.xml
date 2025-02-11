@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="57dp"
+        android:padding="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="My Community"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#000000"
+            android:layout_weight="1"/>
+
+
+        <ImageButton
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/send"
+            android:scaleType="centerInside"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Send"
+            />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="A place for all your questions"
+        android:textSize="17sp"
+        android:layout_marginTop="45dp"
+        android:layout_marginLeft="16dp"
+        android:textColor="#000000"
+        android:layout_weight="1"/>
+    <!-- Stories Section -->
+    <HorizontalScrollView
+        android:id="@+id/storiesSection"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_below="@id/topBar"
+        android:padding="8dp"
+        android:layout_marginTop="20dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <!-- Dummy Story Item -->
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+
+                >
+            <ImageView
+                android:id="@+id/profilepicture"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic1"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+
+                <ImageButton
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_alignRight="@+id/profilepicture"
+                    android:layout_alignBottom="@id/profilepicture"
+                    android:layout_marginRight="-13dp"
+                    android:layout_marginBottom="-7dp"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="AddPost"
+                    android:padding="10dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/add_post_icon" />
+            </RelativeLayout>
+
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic6"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic3"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic4"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic5"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic2"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/profilepic7"
+                android:scaleType="centerCrop"
+                android:background="@drawable/story_circle"
+                android:clipToOutline="true"
+                android:layout_marginRight="10dp"/>
+
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:background="#CCCCCC"
+                android:layout_marginBottom="5dp"/>
+        </LinearLayout>
+
+
+    </HorizontalScrollView>
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/storiesSection"
+        android:layout_above="@id/bottomNavigation">
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- First Post -->
+            <LinearLayout
+                android:id="@+id/postSection1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:background="#CCCCCC"/>
+
+                <!-- User Info -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingLeft="10dp"
+
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/profilepic4"
+                        android:scaleType="centerCrop"
+                        android:background="@drawable/story_circle"
+                        android:clipToOutline="true"
+                        android:layout_marginRight="10dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Emily James"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"/>
+
+                    <ImageButton
+                        android:id="@+id/btn_more1"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/three_dots_icon"
+                        android:layout_marginEnd="8dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:scaleType="centerInside"
+                        android:contentDescription="More options"
+                        />
+                </LinearLayout>
+
+                <!-- Post Image -->
+                <ImageView
+                    android:id="@+id/postImage1"
+                    android:layout_width="match_parent"
+                    android:layout_height="400dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/postpicture"
+                    android:layout_marginTop="8dp"/>
+
+                <!-- Like, Comment, Share Buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:padding="8dp"
+                    android:gravity="center_vertical">
+
+                    <ImageButton
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/like_icon"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:scaleType="centerInside"
+                        android:contentDescription="Like"/>
+
+
+                    <ImageButton
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/comment_icon"
+                        android:scaleType="centerInside"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+
+                        android:contentDescription="Comment"/>
+
+                    <ImageButton
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/send"
+                        android:scaleType="centerInside"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+
+                        android:contentDescription="Send"/>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"/>
+
+                    <ImageButton
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/bookmark_icon"
+                        android:scaleType="centerInside"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Bookmark"
+                        />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:background="#CCCCCC"
+                    android:layout_marginBottom="5dp"/>
+                <!-- Post Caption -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/postcaption1"
+                    android:textSize="14sp"
+                    android:padding="8dp"/>
+
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:background="#CCCCCC"
+                    android:layout_marginBottom="5dp"/>
+            </LinearLayout>
+
+            <!-- Second Post -->
+            <LinearLayout
+                android:id="@+id/postSection2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+
+                <!-- User Info -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingLeft="10dp"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/profilepic2"
+                        android:scaleType="centerCrop"
+                        android:background="@drawable/story_circle"
+                        android:clipToOutline="true"
+                        android:layout_marginRight="10dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Kadin Bergson"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"/>
+
+                    <ImageButton
+                        android:id="@+id/btn_more2"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/three_dots_icon"
+                        android:layout_marginEnd="8dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:scaleType="centerInside"
+                        android:contentDescription="Threedots"/>
+                </LinearLayout>
+
+                <!-- Post Image -->
+                <ImageView
+                    android:id="@+id/postImage2"
+                    android:layout_width="match_parent"
+                    android:layout_height="400dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/profilepic2"
+                    android:layout_marginTop="8dp"/>
+
+                <!-- Like, Comment, Share Buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="8dp"
+                    android:gravity="center_vertical">
+
+                    <ImageButton
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/like_icon"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:scaleType="centerInside"
+                        android:layout_marginEnd="16dp"/>
+
+                    <ImageButton
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/comment_icon"
+                        android:scaleType="centerInside"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:layout_marginEnd="16dp"/>
+
+                    <ImageButton
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/send"
+                        android:scaleType="centerInside"
+                        android:background="?attr/selectableItemBackgroundBorderless"/>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"/>
+
+                    <ImageButton
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/bookmark_icon"
+                        android:scaleType="centerInside"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Bookmark"/>
+                </LinearLayout>
+
+                <!-- Post Caption -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/postcaption2"
+                    android:textSize="14sp"
+                    android:padding="8dp"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="2dp"
+                    android:background="#CCCCCC"/>
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+
+
+
+    <!-- Bottom Navigation -->
+    <LinearLayout
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_alignParentBottom="true"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:padding="8dp"
+        android:gravity="center">
+
+
+
+        <ImageButton
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/home_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="home"
+            />
+
+        <ImageButton
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/search_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Search"
+            />
+
+
+        <ImageButton
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="4dp"
+            android:src="@drawable/add_post_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="AddPost"
+            />
+
+
+
+        <ImageButton
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/profile_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Profile"
+            />
+
+        <ImageButton
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/contacts_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Contacts"
+
+            />
+
+    </LinearLayout>
+
+</RelativeLayout>

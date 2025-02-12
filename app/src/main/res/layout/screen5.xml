@@ -48,35 +48,42 @@
 
         <!-- DMs Tab -->
         <LinearLayout
-            android:id="@+id/tab_dms_container"
+            android:id="@+id/tab_requests_container"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center">
 
-            <TextView
-                android:id="@+id/tab_dms"
+            <!-- Wrap TextView and Underline in another LinearLayout -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DMs"
-                android:textStyle="bold"
-                android:textSize="18sp"
-                android:textColor="@android:color/black"
-                android:gravity="center"
-                android:paddingBottom="4dp"/>
+                android:orientation="vertical"
+                android:gravity="center">
 
-            <!-- Underline -->
-            <View
-                android:id="@+id/tab_dms_underline"
-                android:layout_width="match_parent"
-                android:layout_height="2dp"
-                android:background="@android:color/black"/>
+                <TextView
+                    android:id="@+id/tab_dmss"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="DMs"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/black"
+                    android:gravity="center"
+                    android:paddingBottom="4dp"/>
+
+                <!-- Underline only under text -->
+                <View
+                    android:id="@+id/tab_dms_underline"
+                    android:layout_width="80dp"
+                    android:layout_height="2dp"
+                    android:background="@android:color/black"/>
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Requests Tab -->
         <LinearLayout
-            android:id="@+id/tab_requests_container"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"

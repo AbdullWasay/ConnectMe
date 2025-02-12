@@ -45,6 +45,28 @@
 
         <!-- DMs Tab -->
         <LinearLayout
+            android:id="@+id/tab_dms_container"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tab_dms"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="410 Followers"
+                android:textSize="18sp"
+                android:textColor="#999999"
+                android:gravity="center"
+                android:paddingBottom="4dp"/>
+
+
+        </LinearLayout>
+
+        <!-- Requests Tab -->
+        <LinearLayout
             android:id="@+id/tab_requests_container"
             android:layout_width="0dp"
             android:layout_weight="1"
@@ -60,10 +82,10 @@
                 android:gravity="center">
 
                 <TextView
-                    android:id="@+id/tabfollowing"
+                    android:id="@+id/tab_requests"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="410 Followers"
+                    android:text="387 Following"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:textColor="@color/black"
@@ -77,27 +99,6 @@
                     android:layout_height="2dp"
                     android:background="@android:color/black"/>
             </LinearLayout>
-        </LinearLayout>
-
-        <!-- Requests Tab -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/tab_requests"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="387 Following"
-                android:textSize="18sp"
-                android:textColor="#999999"
-                android:gravity="center"
-                android:paddingBottom="4dp"/>
-
-
         </LinearLayout>
     </LinearLayout>
 

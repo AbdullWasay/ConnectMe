@@ -188,7 +188,7 @@
                 android:layout_columnWeight="1"
                 android:background="@drawable/profile_pictures_border"
                 android:scaleType="centerCrop"
-                android:src="@drawable/profilepic2"/>
+                android:src="@drawable/profilepicture8"/>
 
             <ImageView
                 android:layout_width="0dp"
@@ -212,7 +212,7 @@
                 android:layout_columnWeight="1"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
-                android:src="@drawable/profilepic5"/>
+                android:src="@drawable/profilepicture9"/>
 
             <ImageView
                 android:layout_width="0dp"
@@ -227,28 +227,28 @@
                 android:layout_columnWeight="1"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
-                android:src="@drawable/profilepic1"/>
+                android:src="@drawable/profilepicture10"/>
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
-                android:src="@drawable/profilepic2"/>
+                android:src="@drawable/profilepicture11"/>
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
-                android:src="@drawable/profilepic3"/>
+                android:src="@drawable/postpicture"/>
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
-                android:src="@drawable/profilepic7"/>
+                android:src="@drawable/profilepic5"/>
         </GridLayout>
     </ScrollView>
 

@@ -31,12 +31,7 @@
             android:layout_weight="1"
             android:layout_marginStart="12dp"/>
 
-        <!-- Edit Icon -->
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/edit_icon"
-/>
+
     </LinearLayout>
 
     <!-- Tabs (DMs & Requests) -->
@@ -59,7 +54,7 @@
                 android:id="@+id/tab_dms"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DMs"
+                android:text="410 Followers"
                 android:textStyle="bold"
                 android:textSize="18sp"
                 android:textColor="@android:color/black"
@@ -87,7 +82,7 @@
                 android:id="@+id/tab_requests"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Requests"
+                android:text="387 Following"
                 android:textSize="18sp"
                 android:textColor="#999999"
                 android:gravity="center"
@@ -103,12 +98,12 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginTop="20dp">
-    <!-- Search Bar -->
+        <!-- Search Bar -->
 
         <EditText
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:hint="Search for DMs"
+            android:hint="Search"
             android:paddingHorizontal="12dp"
             android:background="@color/white"
             android:textSize="14sp"
@@ -125,6 +120,7 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:scrollbars="none"
         android:layout_marginTop="12dp">
 
         <LinearLayout
@@ -153,7 +149,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Henry Benjamin"
+                    android:text="Alfredo Lipshutz"
                     android:textSize="16sp"
                     android:textColor="@android:color/black"
                     android:layout_weight="1"
@@ -163,8 +159,8 @@
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
-/>
+                    android:src="@drawable/message_icon"
+                    />
             </LinearLayout>
 
             <!-- Chat Item 2 -->
@@ -187,7 +183,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Emily James"
-                    android:textStyle="bold"
                     android:textSize="16sp"
                     android:textColor="@android:color/black"
                     android:layout_weight="1"
@@ -196,7 +191,7 @@
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
+                    android:src="@drawable/message_icon"
                     />
             </LinearLayout>
 
@@ -228,7 +223,7 @@
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
+                    android:src="@drawable/message_icon"
                     />
             </LinearLayout>
             <!-- Chat Item 4 -->
@@ -259,7 +254,7 @@
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
+                    android:src="@drawable/message_icon"
                     />
             </LinearLayout>
 
@@ -291,7 +286,7 @@
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
+                    android:src="@drawable/message_icon"
                     />
             </LinearLayout>
             <!-- Chat Item 2 -->
@@ -322,9 +317,165 @@
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
+                    android:src="@drawable/message_icon"
                     />
             </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/postpicture"
+                    android:background="@drawable/story_circle"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sandra Dady"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"/>
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/message_icon"
+                    />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/profilepicture8"
+                    android:background="@drawable/story_circle"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Marigold Gomzales"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"/>
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/message_icon"
+                    />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/profilepicture9"
+                    android:background="@drawable/story_circle"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Imojean Swigert"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"/>
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/message_icon"
+                    />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/profilepicture10"
+                    android:background="@drawable/story_circle"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Alex Epley"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"/>
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/message_icon"
+                    />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/profilepicture11"
+                    android:background="@drawable/story_circle"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Rana Serandos"
+                    android:textSize="16sp"
+                    android:textColor="@android:color/black"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"/>
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/message_icon"
+                    />
+            </LinearLayout>
+
 
 
         </LinearLayout>

@@ -198,10 +198,7 @@
                             android:background="#59442F"
                             android:layout_gravity="center_horizontal"/>
                     </LinearLayout>
-
                 </LinearLayout>
-
             </LinearLayout>
-
     </LinearLayout>
 </LinearLayout>

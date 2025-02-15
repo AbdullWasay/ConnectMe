@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@android:color/white"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp">
+
+        <!-- Close Button -->
+        <ImageView
+            android:id="@+id/btnClose"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/cross_icon"/>
+
+        <!-- Title (Centered) -->
+
+        <!-- Next Button -->
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="New post"
+android:layout_marginTop="-3dp"
+            android:textColor="@android:color/black"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnNext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Next"
+            android:textSize="19sp"
+android:textColor="@color/brown"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Selected Image View -->
+    <ImageView
+        android:id="@+id/selectedImage"
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:scaleType="centerCrop"
+        android:padding="40dp"
+        android:src="@drawable/postpicture"
+        android:layout_below="@id/topBar"
+        android:background="@color/white" />
+
+    <!-- Camera and Gallery Icons -->
+    <RelativeLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/selectedImage"
+        android:paddingHorizontal="16dp"
+
+        android:paddingTop="12dp">
+
+
+        <LinearLayout
+            android:id="@+id/Recents"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:orientation="horizontal"
+            android:gravity="center">
+        <TextView
+            android:id="@+id/albumSelector"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Recents"
+            android:textSize="19sp"
+            android:textColor="@android:color/black"
+            android:layout_alignParentStart="true" />
+
+        <ImageView
+            android:id="@+id/arrowicon"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:src="@drawable/right_arrow_icon"
+            android:layout_marginEnd="8dp"/>
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/iconsContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <ImageView
+                android:id="@+id/galleryIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/gallery_icon"
+                android:layout_marginEnd="8dp"/>
+
+            <ImageView
+                android:id="@+id/cameraIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:src="@drawable/bold_camera_icon"
+                android:layout_marginRight="10dp"/>
+        </LinearLayout>
+
+    </RelativeLayout>
+
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/bottomBar"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:scrollbars="none"
+        android:layout_marginTop="10dp"
+        android:fillViewport="true"
+        android:contentDescription="Gallery">
+
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="4"
+            android:layout_marginLeft="17dp"
+            android:layout_marginTop="16dp"
+            android:columnOrderPreserved="false">
+
+            <!-- Image 1 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingLeft="1dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/postpicture"
+                android:alpha="0.6"/>
+
+            <!-- Image 2 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:scaleType="centerCrop"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepicture8"/>
+
+            <!-- Image 3 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:scaleType="centerCrop"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic3"/>
+
+            <!-- Image 4 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic1"/>
+
+            <!-- Image 5 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingLeft="1dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepicture9"/>
+
+            <!-- Image 6 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic6"/>
+
+            <!-- Image 7 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepicture10"/>
+
+            <!-- Image 8 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepicture11"/>
+
+            <!-- Image 9 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:paddingLeft="1dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/postpicture"/>
+
+            <!-- Image 10 -->
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic5"/>
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic4"/>
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic2"/>
+
+            <ImageView
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:scaleType="centerCrop"
+                android:paddingTop="1dp"
+                android:paddingRight="1dp"
+                android:paddingBottom="2dp"
+                android:background="@drawable/profile_pictures_border"
+                android:src="@drawable/profilepic7"/>
+        </GridLayout>
+    </ScrollView>
+
+
+
+
+</RelativeLayout>

@@ -10,7 +10,6 @@
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="57dp"
-        android:padding="16dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@android:color/white"
@@ -178,6 +177,9 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="4dp"
+                android:paddingRight="2dp"
+                android:paddingLeft="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepic1"/>
@@ -186,6 +188,8 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
                 android:background="@drawable/profile_pictures_border"
                 android:scaleType="centerCrop"
                 android:src="@drawable/profilepicture8"/>
@@ -194,6 +198,8 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepic3"/>
@@ -202,6 +208,9 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
+                android:paddingLeft="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepic7"/>
@@ -211,6 +220,8 @@
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
                 android:scaleType="centerCrop"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepicture9"/>
 
@@ -218,6 +229,8 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepic6"/>
@@ -225,6 +238,9 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
+                android:paddingLeft="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepicture10"/>
@@ -232,6 +248,9 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
+                android:paddingBottom="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepicture11"/>
@@ -239,6 +258,9 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
+                android:paddingBottom="dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/postpicture"/>
@@ -246,6 +268,9 @@
                 android:layout_width="0dp"
                 android:layout_height="120dp"
                 android:layout_columnWeight="1"
+                android:paddingTop="6dp"
+                android:paddingRight="2dp"
+                android:paddingLeft="2dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/profilepic5"/>

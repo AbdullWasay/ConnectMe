@@ -197,7 +197,6 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/registerButton"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="20dp"
         android:orientation="horizontal">
 
         <!-- Login Text -->
@@ -212,7 +211,8 @@
             android:layout_centerHorizontal="true"
             android:clickable="true"
             android:layout_marginTop="10dp"
-          />
+            android:padding="15dp"/>
+
 
         <TextView
             android:id="@+id/secondText"

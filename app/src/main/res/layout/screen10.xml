@@ -260,7 +260,7 @@
                 android:layout_columnWeight="1"
                 android:paddingTop="6dp"
                 android:paddingRight="2dp"
-                android:paddingBottom="dp"
+                android:paddingBottom="10dp"
                 android:scaleType="centerCrop"
                 android:background="@drawable/profile_pictures_border"
                 android:src="@drawable/postpicture"/>

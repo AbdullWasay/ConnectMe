@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
+    android:id="@+id/rootLayout"
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -18,6 +19,7 @@
 
         <!-- Back Button -->
         <ImageView
+            android:id="@+id/BackButton"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/back_icon"/>
@@ -36,12 +38,14 @@
 
         <!-- Call & Video Icons -->
         <ImageView
+            android:id="@+id/callbutton"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/call_icon"
             android:layout_marginEnd="12dp"/>
 
         <ImageView
+            android:id="@+id/videocallbutton"
             android:layout_width="30dp"
             android:layout_height="30dp"
             android:src="@drawable/videocall_icon"
@@ -92,6 +96,7 @@ android:layout_marginTop="10dp"
 
     <!-- Chat Section -->
     <ScrollView
+        android:id="@+id/messagearea"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -99,6 +104,7 @@ android:layout_marginTop="10dp"
         android:fillViewport="true">
 
         <LinearLayout
+            android:id="@+id/messagearea1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
 android:layout_marginTop="175dp"

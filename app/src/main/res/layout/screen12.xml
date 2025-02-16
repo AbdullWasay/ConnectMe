@@ -18,7 +18,7 @@
 
         <!-- Back Button -->
         <ImageView
-            android:id="@+id/BackButtonm"
+            android:id="@+id/BackButton"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/back_icon"/>
@@ -45,7 +45,7 @@
 
         <!-- DMs Tab -->
         <LinearLayout
-            android:id="@+id/tab_dms_container"
+            android:id="@+id/FollowersTab"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
@@ -88,7 +88,7 @@
                     android:text="387 Following"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    android:textColor="@color/black"
+                    android:textColor="@color/brown"
                     android:gravity="center"
                     android:paddingBottom="4dp"/>
 
@@ -97,7 +97,7 @@
                     android:id="@+id/tab_dms_underline"
                     android:layout_width="match_parent"
                     android:layout_height="2dp"
-                    android:background="@android:color/black"/>
+                    android:background="@color/brown"/>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

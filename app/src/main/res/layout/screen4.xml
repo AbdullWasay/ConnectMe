@@ -77,6 +77,7 @@
                 android:layout_marginRight="10dp"/>
 
                 <ImageButton
+                    android:id="@+id/AddStory"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
                     android:layout_alignRight="@+id/profilepicture"
@@ -345,15 +346,16 @@
                 </LinearLayout>
 
                 <!-- Post Image -->
+
+                <!-- Like, Comment, Share Buttons -->
                 <ImageView
                     android:id="@+id/postImage2"
                     android:layout_width="match_parent"
                     android:layout_height="400dp"
+                    android:layout_marginTop="8dp"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/profilepic2"
-                    android:layout_marginTop="8dp"/>
+                    android:src="@drawable/profilepic2" />
 
-                <!-- Like, Comment, Share Buttons -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -432,6 +434,7 @@
 
 
         <ImageButton
+            android:id="@+id/HomePage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
@@ -440,21 +443,25 @@
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="home"
+
             />
 
         <ImageButton
+            android:id="@+id/SearchPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
             android:src="@drawable/search_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
+            android:alpha="0.5"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Search"
             />
 
 
         <ImageButton
+            android:id="@+id/PostPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="4dp"
@@ -468,23 +475,27 @@
 
 
         <ImageButton
+            android:id="@+id/ProfilePage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
             android:src="@drawable/profile_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
+            android:alpha="0.5"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Profile"
             />
 
         <ImageButton
+            android:id="@+id/ContactsPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
             android:src="@drawable/contacts_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
+            android:alpha="0.5"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Contacts"
 

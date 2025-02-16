@@ -80,20 +80,19 @@
 
         android:layout_marginLeft="15dp"/>
 
+
     <Button
         android:id="@+id/loginButton"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:text="Login"
-        android:background="@drawable/login_register_button_shape"
-        android:textSize="18sp"
-        android:textColor="#FFFFFF"
-        android:layout_marginLeft="20dp"
-        android:layout_marginRight="20dp"
         android:layout_below="@id/forgotpassword"
-        android:layout_marginTop="25dp"/>
-
-
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="22dp"
+        android:layout_marginRight="20dp"
+        android:background="@drawable/login_register_button_shape"
+        android:text="Login"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp" />
 
     <LinearLayout
         android:layout_width="match_parent"

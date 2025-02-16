@@ -21,11 +21,12 @@
             android:text="My Profile"
             android:textSize="20sp"
             android:textStyle="bold"
+            android:paddingLeft="20dp"
             android:textColor="#000000"
             android:layout_weight="1"/>
 
         <ImageButton
-            android:id="@+id/MessagesButton"
+            android:id="@+id/EditProfile"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
@@ -110,6 +111,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/FollowersPage"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -132,6 +134,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/FollowingPage"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -292,20 +295,24 @@
 
 
         <ImageButton
+            android:id="@+id/HomePage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
             android:src="@drawable/home_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
+            android:alpha="0.5"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="home"
             />
 
         <ImageButton
+            android:id="@+id/SearchPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
+            android:alpha="0.5"
             android:src="@drawable/search_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
@@ -315,6 +322,7 @@
 
 
         <ImageButton
+            android:id="@+id/PostPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="4dp"
@@ -328,6 +336,7 @@
 
 
         <ImageButton
+            android:id="@+id/ProfilePage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
@@ -339,9 +348,11 @@
             />
 
         <ImageButton
+            android:id="@+id/ContactsPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
+            android:alpha="0.5"
             android:src="@drawable/contacts_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"

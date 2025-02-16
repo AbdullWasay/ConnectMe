@@ -69,7 +69,7 @@
                     android:text="DMs"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    android:textColor="@color/black"
+                    android:textColor="@color/brown"
                     android:gravity="center"
                     android:paddingBottom="4dp"/>
 
@@ -139,40 +139,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Chat Item 1 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingVertical="4dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <!-- Profile Picture -->
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/profilepic3"
-                    android:background="@drawable/story_circle"
-                    android:scaleType="centerCrop"
-                    android:clipToOutline="true"/>
-
-                <!-- User Name -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Henry Benjamin"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:layout_weight="1"
-                    android:layout_marginStart="12dp"/>
-
-                <!-- Camera Icon -->
-                <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/camera_icon"
-/>
-            </LinearLayout>
 
             <!-- Chat Item 2 -->
             <LinearLayout
@@ -194,12 +160,48 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Emily James"
-                    android:textStyle="bold"
                     android:textSize="16sp"
                     android:textColor="@android:color/black"
                     android:layout_weight="1"
                     android:layout_marginStart="12dp"/>
 
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/camera_icon"
+                    />
+            </LinearLayout>
+
+            <!-- Chat Item 1 -->
+            <LinearLayout
+                android:id="@+id/chat2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Profile Picture -->
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/profilepic3"
+                    android:background="@drawable/story_circle"
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"/>
+
+                <!-- User Name -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Henry Benjamin"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/black"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"/>
+
+                <!-- Camera Icon -->
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"

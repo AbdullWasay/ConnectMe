@@ -160,17 +160,20 @@
 
 
         <ImageButton
+            android:id="@+id/HomePage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
             android:src="@drawable/home_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
+            android:alpha="0.5"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="home"
             />
 
         <ImageButton
+            android:id="@+id/SearchPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
@@ -183,9 +186,11 @@
 
 
         <ImageButton
+            android:id="@+id/PostPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="4dp"
+
             android:src="@drawable/add_post_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
@@ -196,9 +201,11 @@
 
 
         <ImageButton
+            android:id="@+id/ProfilePage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="12dp"
+            android:alpha="0.5"
             android:src="@drawable/profile_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
@@ -207,8 +214,10 @@
             />
 
         <ImageButton
+            android:id="@+id/ContactsPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
+            android:alpha="0.5"
             android:padding="12dp"
             android:src="@drawable/contacts_icon"
             android:scaleType="centerInside"

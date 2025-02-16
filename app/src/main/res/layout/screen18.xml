@@ -5,8 +5,14 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@android:color/white"
-    android:padding="16dp">
+   >
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="16dp">
     <!-- Top Bar -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,7 +22,7 @@
 
         <!-- Back Button -->
         <ImageView
-            android:id="@+id/BackButtonm"
+            android:id="@+id/BackButton"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/back_icon"/>
@@ -223,6 +229,7 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:layout_marginTop="12dp">
 
         <LinearLayout
@@ -263,7 +270,7 @@
                     android:layout_height="40dp"
                     android:text="Invite"
                     android:textColor="@android:color/white"
-                    android:textSize="14sp"/>
+                    android:textSize="13sp"/>
 
             </LinearLayout>
 
@@ -296,7 +303,7 @@
                     android:layout_height="40dp"
                     android:text="Invite"
                     android:textColor="@android:color/white"
-                    android:textSize="14sp"/>
+                    android:textSize="13sp"/>
             </LinearLayout>
 
             <!-- Chat Item 3 -->
@@ -329,11 +336,93 @@
                     android:layout_height="40dp"
                     android:text="Invite"
                     android:textColor="@android:color/white"
-                    android:textSize="14sp"/>
+                    android:textSize="13sp"/>
             </LinearLayout>
 
 
 
         </LinearLayout>
     </ScrollView>
+    </LinearLayout>
+    <!-- Bottom Navigation -->
+    <LinearLayout
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_alignParentBottom="true"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:padding="8dp"
+        android:gravity="center">
+
+
+
+        <ImageButton
+            android:id="@+id/HomePage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/home_icon"
+            android:scaleType="centerInside"
+            android:alpha="0.5"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="home"
+            />
+
+        <ImageButton
+            android:id="@+id/SearchPage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/search_icon"
+            android:alpha="0.5"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Search"
+            />
+
+
+        <ImageButton
+            android:id="@+id/PostPage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="4dp"
+            android:src="@drawable/add_post_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="AddPost"
+            />
+
+
+
+        <ImageButton
+            android:id="@+id/ProfilePage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/profile_icon"
+            android:scaleType="centerInside"
+            android:alpha="0.5"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Profile"
+            />
+
+        <ImageButton
+            android:id="@+id/ContactsPage"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/contacts_icon"
+            android:scaleType="centerInside"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Contacts"
+
+            />
+
+    </LinearLayout>
 </LinearLayout>

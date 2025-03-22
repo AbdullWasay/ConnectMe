@@ -18,6 +18,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : AppCompatActivity() {
@@ -33,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScreen2() {
-        setContentView(R.layout.screen2) // Screen 2 layout
+        setContentView(R.layout.screen2)
 
         val registerText = findViewById<TextView>(R.id.secondText)
         registerText.setOnClickListener {
@@ -53,33 +54,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private fun loginUser(username: String, password: String) {
-        val db = FirebaseFirestore.getInstance()
+        val database = FirebaseDatabase.getInstance()
+        val usersRef = database.getReference("Users")
 
-        db.collection("Users")
-            .whereEqualTo("username", username)
-            .get()
-            .addOnSuccessListener { documents ->
-                if (!documents.isEmpty) {
-                    val user = documents.documents[0]
-                    val email = user.getString("email") ?: ""
-
-                    // Now use FirebaseAuth to sign in using the email and password
-                    auth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
-                                showScreen4()
-                            } else {
-                                Toast.makeText(this, "Incorrect password", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+        usersRef.child(username).get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val dbPassword = snapshot.child("password").value.toString()
+                if (dbPassword == password) {
+                    Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
+                    showScreen4() // Navigate to home screen
                 } else {
-                    Toast.makeText(this, "User not found", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Incorrect password", Toast.LENGTH_SHORT).show()
                 }
+            } else {
+                Toast.makeText(this, "Username not found", Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        }.addOnFailureListener {
+            Toast.makeText(this, "Login failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
 
@@ -113,34 +105,32 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    val userId = auth.currentUser?.uid
+        val database = FirebaseDatabase.getInstance()
+        val usersRef = database.getReference("Users")
 
-                    // Save extra data to Firestore
-                    val userMap = hashMapOf(
-                        "name" to name,
-                        "username" to username,
-                        "phone" to phone,
-                        "email" to email
-                    )
-
-                    FirebaseFirestore.getInstance().collection("Users")
-                        .document(userId!!)
-                        .set(userMap)
-                        .addOnSuccessListener {
-                            Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
-                            showScreen2()
-                        }
-                        .addOnFailureListener { e ->
-                            Toast.makeText(this, "Signup successful but failed to store data: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-
-                } else {
-                    Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                }
+        // Check if username already exists
+        usersRef.child(username).get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                Toast.makeText(this, "Username already exists", Toast.LENGTH_SHORT).show()
+            } else {
+                // Save user data
+                val userMap = mapOf(
+                    "name" to name,
+                    "username" to username,
+                    "phone" to phone,
+                    "email" to email,
+                    "password" to password // In production, hash the password!
+                )
+                usersRef.child(username).setValue(userMap)
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
+                        showScreen2()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "Signup failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
             }
+        }
     }
 
     private fun showScreen4() {

@@ -18,6 +18,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
@@ -62,29 +63,48 @@ class MainActivity : AppCompatActivity() {
             val email = findViewById<EditText>(R.id.emailInput).text.toString()
             val password = findViewById<EditText>(R.id.passwordInput).text.toString()
 
+            signUpUser(name, username, phonenumber, email, password)
 
-            signUpUser(email, password)
 
 
         }
     }
 
-        private fun signUpUser(email: String, password: String) {
-            if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                return
-            }
+    private fun signUpUser(name: String, username: String, phone: String, email: String, password: String) {
+        if (email.isEmpty() || password.isEmpty() || name.isEmpty() || username.isEmpty() || phone.isEmpty()) {
+            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-            auth.createUserWithEmailAndPassword(email, password)
-                .addOnCompleteListener(this) { task ->
-                    if (task.isSuccessful) {
-                        Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
-                        showScreen2()
-                    } else {
-                        Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                    }
+        auth.createUserWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    val userId = auth.currentUser?.uid
+
+                    // Save extra data to Firestore
+                    val userMap = hashMapOf(
+                        "name" to name,
+                        "username" to username,
+                        "phone" to phone,
+                        "email" to email
+                    )
+
+                    FirebaseFirestore.getInstance().collection("Users")
+                        .document(userId!!)
+                        .set(userMap)
+                        .addOnSuccessListener {
+                            Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
+                            showScreen2()
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Signup successful but failed to store data: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+
+                } else {
+                    Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+    }
 
     private fun showScreen4() {
         setContentView(R.layout.screen4) // Screen 4 layout

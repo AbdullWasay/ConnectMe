@@ -40,11 +40,48 @@ class MainActivity : AppCompatActivity() {
             showScreen3()
         }
 
-        val loginText = findViewById<Button>(R.id.loginButton)
-        loginText.setOnClickListener {
-            showScreen10()
+        val loginButton = findViewById<Button>(R.id.loginButton)
+        loginButton.setOnClickListener {
+            val usernameInput = findViewById<EditText>(R.id.username).text.toString()
+            val passwordInput = findViewById<EditText>(R.id.passwordtext).text.toString()
+
+            if (usernameInput.isEmpty() || passwordInput.isEmpty()) {
+                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+            } else {
+                loginUser(usernameInput, passwordInput)
+            }
         }
     }
+    private fun loginUser(username: String, password: String) {
+        val db = FirebaseFirestore.getInstance()
+
+        db.collection("Users")
+            .whereEqualTo("username", username)
+            .get()
+            .addOnSuccessListener { documents ->
+                if (!documents.isEmpty) {
+                    val user = documents.documents[0]
+                    val email = user.getString("email") ?: ""
+
+                    // Now use FirebaseAuth to sign in using the email and password
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
+                                showScreen4()
+                            } else {
+                                Toast.makeText(this, "Incorrect password", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                } else {
+                    Toast.makeText(this, "User not found", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
 
     private fun showScreen3() {
         setContentView(R.layout.screen3) // Screen 3 layout

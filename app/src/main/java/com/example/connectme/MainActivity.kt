@@ -15,11 +15,15 @@ import androidx.fragment.app.Fragment
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.widget.EditText
+import android.widget.Toast
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var auth: FirebaseAuth
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        auth = FirebaseAuth.getInstance()
         setContentView(R.layout.activity_main) // Screen 1 layout
 
         Handler(Looper.getMainLooper()).postDelayed({
@@ -49,7 +53,38 @@ class MainActivity : AppCompatActivity() {
             showScreen2()
         }
 
+
+        val registerButton = findViewById<Button>(R.id.registerButton)
+        registerButton.setOnClickListener {
+            val name = findViewById<EditText>(R.id.nameInput).text.toString()
+            val username = findViewById<EditText>(R.id.usernameInput).text.toString()
+            val phonenumber = findViewById<EditText>(R.id.phoneInput).text.toString()
+            val email = findViewById<EditText>(R.id.emailInput).text.toString()
+            val password = findViewById<EditText>(R.id.passwordInput).text.toString()
+
+
+            signUpUser(email, password)
+
+
+        }
     }
+
+        private fun signUpUser(email: String, password: String) {
+            if (email.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            auth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
+                        showScreen2()
+                    } else {
+                        Toast.makeText(this, "Signup failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
 
     private fun showScreen4() {
         setContentView(R.layout.screen4) // Screen 4 layout

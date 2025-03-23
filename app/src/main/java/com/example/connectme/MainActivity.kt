@@ -15,7 +15,6 @@ import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import com.bumptech.glide.Glide
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
@@ -27,8 +26,10 @@ import androidx.appcompat.app.AppCompatActivity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.bumptech.glide.Glide
 
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
@@ -387,8 +388,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // If you want to support multiple images (since your UI shows horizontally scrollable images)
+    private var selectedImageUris: ArrayList<android.net.Uri> = ArrayList()
+
+    // Modify showScreen15 function to reset image selections when entering the screen
+    private var multiSelectMode = false
+    private val selectedPositions = HashSet<Int>()
+
+    // Modify your showScreen15() function to change the galleryIcon click behavior
     private fun showScreen15() {
         setContentView(R.layout.screen15)
+
+        // Reset selected images when entering this screen
+        selectedImageUris.clear()
+        selectedImageUri = null
+        multiSelectMode = false
+        selectedPositions.clear()
 
         val closePost = findViewById<ImageView>(R.id.btnClose)
         closePost.setOnClickListener {
@@ -397,7 +412,12 @@ class MainActivity : AppCompatActivity() {
 
         val nextPost = findViewById<TextView>(R.id.btnNext)
         nextPost.setOnClickListener {
-            showScreen17()
+            // Only proceed if at least one image is selected
+            if (selectedImageUris.isNotEmpty()) {
+                showScreen17()
+            } else {
+                Toast.makeText(this, "Please select at least one image", Toast.LENGTH_SHORT).show()
+            }
         }
 
         // Check and request permissions
@@ -406,13 +426,23 @@ class MainActivity : AppCompatActivity() {
             loadGalleryImages()
         }
 
-        // Set click listener for gallery icon
+        // Set click listener for gallery icon - now toggles multi-select mode
         val galleryIcon = findViewById<ImageView>(R.id.galleryIcon)
         galleryIcon.setOnClickListener {
-            // Open gallery intent
-            val intent = Intent(Intent.ACTION_PICK)
-            intent.type = "image/*"
-            startActivityForResult(intent, PICK_IMAGE_REQUEST)
+            // Toggle multi-select mode
+            multiSelectMode = !multiSelectMode
+
+            // Update UI to indicate multi-select mode
+            if (multiSelectMode) {
+                Toast.makeText(this, "Multi-select mode enabled. Tap images to select.", Toast.LENGTH_SHORT).show()
+                galleryIcon.alpha = 0.6f  // Visual indicator that multi-select is active
+            } else {
+                Toast.makeText(this, "Multi-select mode disabled", Toast.LENGTH_SHORT).show()
+                galleryIcon.alpha = 1.0f
+            }
+
+            // Refresh the gallery to update the UI
+            loadGalleryImages()
         }
 
         // Set click listener for camera icon
@@ -424,7 +454,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
     private fun showScreen16() {
         setContentView(R.layout.screen16)
 
@@ -442,17 +471,69 @@ class MainActivity : AppCompatActivity() {
     private fun showScreen17() {
         setContentView(R.layout.screen17)
 
-        val ClosePost = findViewById<ImageView>(R.id.btnClose)
-        ClosePost.setOnClickListener {
+        val closePost = findViewById<ImageView>(R.id.btnClose)
+        closePost.setOnClickListener {
             showScreen4()
         }
 
-        val SharePost = findViewById<TextView>(R.id.btnShare)
-        SharePost.setOnClickListener {
+        val sharePost = findViewById<TextView>(R.id.btnShare)
+        sharePost.setOnClickListener {
+            // Here you might implement code to actually post the image
+            Toast.makeText(this, "Post shared successfully!", Toast.LENGTH_SHORT).show()
             showScreen4()
+        }
+
+        // Display the selected images in the horizontal scroll view
+        val scrollView = findViewById<HorizontalScrollView>(R.id.postSection)
+        val linearLayout = scrollView.getChildAt(0) as LinearLayout
+
+        // Clear any existing views
+        linearLayout.removeAllViews()
+
+        // Only use the selectedImageUris list to avoid duplication
+        if (selectedImageUris.isNotEmpty()) {
+            for (uri in selectedImageUris) {
+                val imageView = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        250.dpToPx(),  // Use the same width as in your XML
+                        320.dpToPx()   // Use the same height as in your XML
+                    ).apply {
+                        leftMargin = if (linearLayout.childCount == 0) 30.dpToPx() else 20.dpToPx()  // Match your XML margins
+                    }
+                    clipToOutline = true
+                    background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }
+
+                Glide.with(this)
+                    .load(uri)
+                    .centerCrop()
+                    .into(imageView)
+
+                linearLayout.addView(imageView)
+            }
+        } else if (selectedImageUri != null) {
+            // Fallback to the single image if the list is somehow empty but we have a selection
+            val imageView = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    250.dpToPx(),
+                    320.dpToPx()
+                ).apply {
+                    leftMargin = 30.dpToPx()
+                }
+                clipToOutline = true
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+            }
+
+            Glide.with(this)
+                .load(selectedImageUri)
+                .centerCrop()
+                .into(imageView)
+
+            linearLayout.addView(imageView)
         }
     }
-
     private fun showScreen18() {
         setContentView(R.layout.screen18)
 
@@ -567,8 +648,11 @@ class MainActivity : AppCompatActivity() {
                             // Set tag with the URI for later retrieval
                             tag = imageUri.toString()
 
-                            // Set click listener for the thumbnail (defining it outside the apply block to avoid nested context issues)
-                            setOnClickListener(null) // Clear any previous listeners
+                            // Set position tag for tracking selection
+                            setTag(R.id.tag_position, count)
+
+                            // If this image is in our selected list, show it as selected
+                            alpha = if (selectedImageUris.contains(imageUri) || selectedPositions.contains(count)) 0.6f else 1.0f
                         }
 
                         // Load image using Glide
@@ -580,37 +664,68 @@ class MainActivity : AppCompatActivity() {
                         // Set click listener after loading the image
                         imageView.setOnClickListener { view ->
                             try {
-                                // Find the selectedImage view
-                                val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
-                                if (selectedImageView == null) {
-                                    Log.e("MainActivity", "selectedImage view not found")
-                                    return@setOnClickListener
-                                }
-
                                 // Get URI from tag
                                 val clickedUri = android.net.Uri.parse(view.tag as String)
+                                val position = view.getTag(R.id.tag_position) as Int
 
-                                // Update selected image
-                                selectedImageUri = clickedUri
+                                // Find the selectedImage view for preview
+                                val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
 
-                                // Use try-catch specifically for the Glide call
-                                try {
+                                if (multiSelectMode) {
+                                    // In multi-select mode, toggle selection
+                                    if (selectedImageUris.contains(clickedUri)) {
+                                        // Deselect
+                                        selectedImageUris.remove(clickedUri)
+                                        selectedPositions.remove(position)
+                                        view.alpha = 1.0f
+                                    } else {
+                                        // Select
+                                        selectedImageUris.add(clickedUri)
+                                        selectedPositions.add(position)
+                                        view.alpha = 0.6f
+                                    }
+
+                                    // Update the count
+                                    Toast.makeText(this@MainActivity, "${selectedImageUris.size} images selected", Toast.LENGTH_SHORT).show()
+
+                                    // Update preview with the last selected image if any
+                                    if (selectedImageUris.isNotEmpty()) {
+                                        selectedImageUri = selectedImageUris.last()
+                                        Glide.with(this@MainActivity)
+                                            .load(selectedImageUri)
+                                            .centerCrop()
+                                            .into(selectedImageView)
+                                    } else {
+                                        // Clear preview if no images selected
+                                        selectedImageView.setImageDrawable(null)
+                                        selectedImageUri = null
+                                    }
+                                } else {
+                                    // In single-select mode, just select this one image
+                                    selectedImageUri = clickedUri
+
+                                    // Clear existing selections
+                                    selectedImageUris.clear()
+                                    selectedPositions.clear()
+
+                                    // Add this as the only selection
+                                    selectedImageUris.add(clickedUri)
+                                    selectedPositions.add(position)
+
+                                    // Update the preview
                                     Glide.with(this@MainActivity)
                                         .load(clickedUri)
                                         .centerCrop()
                                         .into(selectedImageView)
-                                } catch (e: Exception) {
-                                    Log.e("MainActivity", "Error loading image with Glide: ${e.message}")
-                                    Toast.makeText(this@MainActivity, "Failed to load selected image", Toast.LENGTH_SHORT).show()
-                                }
 
-                                // Reset alpha for all thumbnails
-                                for (iv in imageViewList) {
-                                    iv.alpha = 1.0f
-                                }
+                                    // Reset alpha for all thumbnails
+                                    for (iv in imageViewList) {
+                                        iv.alpha = 1.0f
+                                    }
 
-                                // Highlight the selected thumbnail
-                                view.alpha = 0.6f
+                                    // Highlight only the selected thumbnail
+                                    view.alpha = 0.6f
+                                }
 
                             } catch (e: Exception) {
                                 Log.e("MainActivity", "Error in click handler: ${e.message}")
@@ -621,12 +736,14 @@ class MainActivity : AppCompatActivity() {
                         imageViewList.add(imageView)
                         gridLayout.addView(imageView)
 
-                        // If it's the first image, select it by default
-                        if (count == 0) {
+                        // If it's the first image and we have no selections, select it by default
+                        if (count == 0 && selectedImageUris.isEmpty() && !multiSelectMode) {
                             // Get the selected image view
                             val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
                             if (selectedImageView != null) {
                                 selectedImageUri = imageUri
+                                selectedImageUris.add(imageUri)
+                                selectedPositions.add(count)
 
                                 // Load the image into the selected image view
                                 Glide.with(this)
@@ -660,7 +777,6 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Error loading gallery: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
-
     // Add this method to help with debugging
     private fun logImageInfo(imageView: ImageView, uri: android.net.Uri) {
         try {
@@ -741,28 +857,62 @@ class MainActivity : AppCompatActivity() {
         if (resultCode == Activity.RESULT_OK) {
             when (requestCode) {
                 PICK_IMAGE_REQUEST -> {
-                    // Handle gallery image selection
-                    data?.data?.let { uri ->
-                        selectedImageUri = uri
-                        val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
-                        Glide.with(this)
-                            .load(uri)
-                            .centerCrop()
-                            .into(selectedImageView)
+                    // Check if multiple images were selected
+                    if (data?.clipData != null) {
+                        val clipData = data.clipData
+                        val count = clipData?.itemCount ?: 0
 
-                        // Reload gallery with the new image selected
-                        loadGalleryImages()
+                        // Clear previous selections if you want to replace them
+                        // Or comment this line if you want to add to existing selections
+                        selectedImageUris.clear()
+
+                        // Add all selected images to our list
+                        for (i in 0 until count) {
+                            val imageUri = clipData?.getItemAt(i)?.uri
+                            if (imageUri != null && !selectedImageUris.contains(imageUri)) {
+                                selectedImageUris.add(imageUri)
+                            }
+                        }
+
+                        // Set the first image as the preview if available
+                        if (selectedImageUris.isNotEmpty()) {
+                            selectedImageUri = selectedImageUris[0]
+                            val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
+                            Glide.with(this)
+                                .load(selectedImageUri)
+                                .centerCrop()
+                                .into(selectedImageView)
+                        }
+
+                        // Show a counter or indicator of how many images are selected
+                        Toast.makeText(this, "${selectedImageUris.size} images selected", Toast.LENGTH_SHORT).show()
+
+                    } else {
+                        // Handle single image selection (your existing code)
+                        data?.data?.let { uri ->
+                            selectedImageUri = uri
+                            // Add to our list if we're supporting multiple images
+                            if (!selectedImageUris.contains(uri)) {
+                                selectedImageUris.add(uri)
+                            }
+
+                            val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
+                            Glide.with(this)
+                                .load(uri)
+                                .centerCrop()
+                                .into(selectedImageView)
+                        }
                     }
+
+                    // Reload gallery with the new image(s) selected
+                    loadGalleryImages()
                 }
-                CAMERA_REQUEST -> {
-                    // Handle camera image
-                    val bitmap = data?.extras?.get("data") as? Bitmap
-                    bitmap?.let {
-                        val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
-                        selectedImageView.setImageBitmap(bitmap)
-                    }
-                }
+                // Rest of your code...
             }
         }
     }
+
+
+
+
 }

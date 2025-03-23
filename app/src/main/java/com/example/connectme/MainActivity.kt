@@ -1,10 +1,11 @@
 package com.example.connectme
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.Manifest
 import android.app.Activity
 import android.content.ContentUris
+ import android.util.Log
+
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
@@ -660,6 +661,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Add this method to help with debugging
     private fun logImageInfo(imageView: ImageView, uri: android.net.Uri) {
         try {
             Log.d("ImageDebug", "ImageView dimensions: ${imageView.width}x${imageView.height}")
@@ -683,6 +685,9 @@ class MainActivity : AppCompatActivity() {
             Log.e("ImageDebug", "Error logging image info: ${e.message}")
         }
     }
+
+// Add these imports at the top of your file:
+// import android.util.Log
 
     private fun getImageCursor(): Cursor? {
         val projection = arrayOf(

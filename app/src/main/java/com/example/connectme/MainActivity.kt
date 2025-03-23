@@ -6,6 +6,15 @@ import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
 import android.util.Log
+// Add these imports at the top of your file
+import android.graphics.BitmapFactory
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
+
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.content.SharedPreferences
@@ -351,9 +360,132 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showScreen10() {
-        setContentView(R.layout.screen10) // Screen 4 layout
+    // Add this function to MainActivity class to fetch and display user posts
+    private fun loadUserPosts(username: String) {
+        try {
+            val postsGridLayout = findViewById<GridLayout>(R.id.postsGrid)
+            postsGridLayout.removeAllViews() // Clear existing views
 
+            // Reference to Firebase posts
+            val database = FirebaseDatabase.getInstance()
+            val postsRef = database.getReference("Posts")
+
+            // Query to find posts by this username
+            postsRef.orderByChild("username").equalTo(username)
+                .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                    override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                        if (snapshot.exists()) {
+                            val posts = ArrayList<Map<String, Any>>()
+
+                            // Collect all posts
+                            for (postSnapshot in snapshot.children) {
+                                val post = postSnapshot.value as? Map<String, Any>
+                                post?.let {
+                                    // Add post ID to the map
+                                    val postWithId = post.toMutableMap()
+                                    postWithId["postId"] = postSnapshot.key.toString()
+                                    posts.add(postWithId)
+                                }
+                            }
+
+                            // Sort posts by timestamp (most recent first)
+                            posts.sortByDescending { it["timestamp"] as? String }
+
+                            // Update post count in UI
+                            findViewById<TextView>(R.id.postcount).text = posts.size.toString()
+
+                            // Display posts in grid
+                            displayPostsInGrid(posts, postsGridLayout)
+                        } else {
+                            // No posts found
+                            findViewById<TextView>(R.id.postcount).text = "0"
+                            Toast.makeText(this@MainActivity, "No posts found", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                        Toast.makeText(this@MainActivity, "Error loading posts: ${error.message}",
+                            Toast.LENGTH_SHORT).show()
+                    }
+                })
+        } catch (e: Exception) {
+            Log.e("LoadUserPosts", "Error: ${e.message}")
+            Toast.makeText(this, "Error loading posts: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Helper function to display posts in grid layout
+    private fun displayPostsInGrid(posts: List<Map<String, Any>>, gridLayout: GridLayout) {
+        try {
+            // Set up grid layout parameters
+            val columnCount = 3
+            gridLayout.columnCount = columnCount
+
+            // Calculate cell size based on screen width
+            val cellSize = resources.displayMetrics.widthPixels / columnCount
+
+            // Add each post to the grid
+            for (i in posts.indices) {
+                val post = posts[i]
+
+                // Get the first image from the post (if it has any)
+                val imagesList = post["images"] as? ArrayList<*>
+                if (imagesList.isNullOrEmpty()) continue
+
+                val base64Image = imagesList[0] as? String ?: continue
+
+                // Create image view for the post
+                val imageView = ImageView(this).apply {
+                    val params = GridLayout.LayoutParams()
+                    params.width = cellSize
+                    params.height = cellSize
+                    layoutParams = params
+
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    // Optional: add padding or border
+                    setPadding(2.dpToPx(), 2.dpToPx(), 2.dpToPx(), 2.dpToPx())
+                }
+
+                // Get the post ID (for handling clicks)
+                val postId = post["postId"] as? String
+                imageView.tag = postId
+
+                // Handle click on post image
+                imageView.setOnClickListener {
+                    // TODO: Navigate to post detail screen
+                    Toast.makeText(this, "Post clicked: $postId", Toast.LENGTH_SHORT).show()
+                }
+
+                // Convert base64 to bitmap and display
+                try {
+                    val imageBytes = android.util.Base64.decode(base64Image, android.util.Base64.DEFAULT)
+                    val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    imageView.setImageBitmap(decodedImage)
+                } catch (e: Exception) {
+                    Log.e("DisplayPosts", "Error decoding image: ${e.message}")
+                    // Set a placeholder image if decoding fails
+                    imageView.setImageResource(R.drawable.profile_pictures_border)
+                }
+
+                // Add the image to grid
+                gridLayout.addView(imageView)
+            }
+
+            // If no posts were added to the grid, show a message
+            if (gridLayout.childCount == 0) {
+                findViewById<TextView>(R.id.postcount).text = "0"
+            }
+        } catch (e: Exception) {
+            Log.e("DisplayPosts", "Error: ${e.message}")
+            Toast.makeText(this, "Error displaying posts: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Now update the showScreen10 method to load user posts
+    private fun showScreen10() {
+        setContentView(R.layout.screen10) // Screen 10 layout
+
+        // Your existing code for this function...
         val followersPage = findViewById<LinearLayout>(R.id.FollowersPage)
         followersPage.setOnClickListener {
             showScreen11()
@@ -395,12 +527,15 @@ class MainActivity : AppCompatActivity() {
         val email = sharedPreferences.getString(KEY_EMAIL, "")
         val phone = sharedPreferences.getString(KEY_PHONE, "")
 
-        // Add code to update UI with this information
-        // For example:
+        // Update UI with user information
         findViewById<TextView>(R.id.username).text = name
-        // findViewById<TextView>(R.id.profileUsername).text = username
-        // findViewById<TextView>(R.id.profileEmail).text = email
-        // findViewById<TextView>(R.id.profilePhone).text = phone
+
+        // Add this line to load the user's posts
+        if (!username.isNullOrEmpty()) {
+            loadUserPosts(username)
+        } else {
+            Toast.makeText(this, "Cannot load posts: Username not found", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showScreen11() {
@@ -545,6 +680,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+    // Add this function to convert images to Base64
+    private fun uriToBase64(uri: android.net.Uri): String {
+        val inputStream = contentResolver.openInputStream(uri)
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.DEFAULT)
+    }
+
+    // Modify the showScreen17 function to add Firebase post functionality
     private fun showScreen17() {
         setContentView(R.layout.screen17)
 
@@ -553,29 +700,20 @@ class MainActivity : AppCompatActivity() {
             showScreen4()
         }
 
-        val sharePost = findViewById<TextView>(R.id.btnShare)
-        sharePost.setOnClickListener {
-            // Here you might implement code to actually post the image
-            Toast.makeText(this, "Post shared successfully!", Toast.LENGTH_SHORT).show()
-            showScreen4()
-        }
-
-        // Display the selected images in the horizontal scroll view
+        // Show the selected images in the horizontal scroll view
         val scrollView = findViewById<HorizontalScrollView>(R.id.postSection)
         val linearLayout = scrollView.getChildAt(0) as LinearLayout
-
-        // Clear any existing views
         linearLayout.removeAllViews()
 
-        // Only use the selectedImageUris list to avoid duplication
+        // Display selected images
         if (selectedImageUris.isNotEmpty()) {
             for (uri in selectedImageUris) {
                 val imageView = ImageView(this).apply {
                     layoutParams = LinearLayout.LayoutParams(
-                        250.dpToPx(),  // Use the same width as in your XML
-                        320.dpToPx()   // Use the same height as in your XML
+                        250.dpToPx(),
+                        320.dpToPx()
                     ).apply {
-                        leftMargin = if (linearLayout.childCount == 0) 30.dpToPx() else 20.dpToPx()  // Match your XML margins
+                        leftMargin = if (linearLayout.childCount == 0) 30.dpToPx() else 20.dpToPx()
                     }
                     clipToOutline = true
                     background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
@@ -590,7 +728,7 @@ class MainActivity : AppCompatActivity() {
                 linearLayout.addView(imageView)
             }
         } else if (selectedImageUri != null) {
-            // Fallback to the single image if the list is somehow empty but we have a selection
+            // Fallback to single image
             val imageView = ImageView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     250.dpToPx(),
@@ -609,6 +747,96 @@ class MainActivity : AppCompatActivity() {
                 .into(imageView)
 
             linearLayout.addView(imageView)
+        }
+
+        // Implement share button functionality
+        val sharePost = findViewById<Button>(R.id.btnShare)
+        sharePost.setOnClickListener {
+            // Get caption text
+            val captionView = findViewById<TextView>(R.id.description)
+            val caption = captionView.text.toString()
+
+            // Check if it's the default text and replace with empty string if it is
+            val finalCaption = if (caption == "Add a caption...") "" else caption
+
+            // Show loading message
+            Toast.makeText(this, "Uploading post...", Toast.LENGTH_SHORT).show()
+
+            // Upload the post to Firebase
+            uploadPostToFirebase(finalCaption)
+        }
+    }
+
+    private fun uploadPostToFirebase(caption: String) {
+        try {
+            // Get current logged in username
+            val username = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+            if (username.isEmpty()) {
+                Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            // Create database reference
+            val database = FirebaseDatabase.getInstance()
+            val postsRef = database.getReference("Posts")
+
+            // Generate a unique ID for this post
+            val postId = UUID.randomUUID().toString()
+
+            // Get current timestamp
+            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+            // Prepare images list
+            val imagesList = ArrayList<String>()
+
+            // Convert images to base64
+            if (selectedImageUris.isNotEmpty()) {
+                // Convert all selected images to base64
+                for (uri in selectedImageUris) {
+                    try {
+                        val base64Image = uriToBase64(uri)
+                        imagesList.add(base64Image)
+                    } catch (e: Exception) {
+                        Log.e("UploadPost", "Error converting image: ${e.message}")
+                    }
+                }
+            } else if (selectedImageUri != null) {
+                // Convert single image to base64
+                try {
+                    val base64Image = uriToBase64(selectedImageUri!!)
+                    imagesList.add(base64Image)
+                } catch (e: Exception) {
+                    Log.e("UploadPost", "Error converting single image: ${e.message}")
+                }
+            }
+
+            if (imagesList.isEmpty()) {
+                Toast.makeText(this, "No images to upload", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            // Create post data structure
+            val postMap = mapOf(
+                "username" to username,
+                "caption" to caption,
+                "timestamp" to timestamp,
+                "images" to imagesList,
+                "likes" to 0,
+                "comments" to ArrayList<String>()
+            )
+
+            // Save to Firebase
+            postsRef.child(postId).setValue(postMap)
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Post shared successfully!", Toast.LENGTH_SHORT).show()
+                    showScreen4()
+                }
+                .addOnFailureListener { e ->
+                    Toast.makeText(this, "Error sharing post: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            Log.e("UploadPost", "Error: ${e.message}")
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
     private fun showScreen18() {

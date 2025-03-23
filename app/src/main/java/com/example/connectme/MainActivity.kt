@@ -4,21 +4,22 @@ import android.os.Bundle
 import android.Manifest
 import android.app.Activity
 import android.content.ContentUris
- import android.util.Log
-
+import android.content.Context
+import android.util.Log
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
 import android.widget.ImageButton
+
 import android.widget.ScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -27,6 +28,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.bumptech.glide.Glide
@@ -34,15 +36,59 @@ import com.bumptech.glide.Glide
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private var selectedImageUri: android.net.Uri? = null
+    private lateinit var sharedPreferences: SharedPreferences
+
+
+    companion object {
+        private const val PREF_NAME = "ConnectMePrefs"
+        private const val KEY_IS_LOGGED_IN = "isLoggedIn"
+        private const val KEY_USERNAME = "username"
+        private const val KEY_NAME = "name"
+        private const val KEY_EMAIL = "email"
+        private const val KEY_PHONE = "phone"
+    }
+
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
+        sharedPreferences = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
         setContentView(R.layout.activity_main) // Screen 1 layout
 
-        Handler(Looper.getMainLooper()).postDelayed({
-            showScreen2()
-        }, 3000)
+        if (isLoggedIn()) {
+            // Skip to home screen
+            Handler(Looper.getMainLooper()).postDelayed({
+                showScreen4()
+            }, 1000)
+        } else {
+            // Show login screen after splash
+            Handler(Looper.getMainLooper()).postDelayed({
+                showScreen2()
+            }, 3000)
+        }
+    }
+
+    private fun isLoggedIn(): Boolean {
+        return sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)
+    }
+
+    private fun saveUserCredentials(username: String, name: String, email: String, phone: String) {
+        val editor = sharedPreferences.edit()
+        editor.putBoolean(KEY_IS_LOGGED_IN, true)
+        editor.putString(KEY_USERNAME, username)
+        editor.putString(KEY_NAME, name)
+        editor.putString(KEY_EMAIL, email)
+        editor.putString(KEY_PHONE, phone)
+        editor.apply()
+    }
+
+    // Clear user credentials on logout
+    private fun clearUserCredentials() {
+        val editor = sharedPreferences.edit()
+        editor.clear()
+        editor.apply()
     }
 
     private fun showScreen2() {
@@ -74,6 +120,14 @@ class MainActivity : AppCompatActivity() {
             if (snapshot.exists()) {
                 val dbPassword = snapshot.child("password").value.toString()
                 if (dbPassword == password) {
+                    // Get user data from database
+                    val name = snapshot.child("name").value.toString()
+                    val email = snapshot.child("email").value.toString()
+                    val phone = snapshot.child("phone").value.toString()
+
+                    // Save credentials to SharedPreferences
+                    saveUserCredentials(username, name, email, phone)
+
                     Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
                     showScreen4() // Navigate to home screen
                 } else {
@@ -131,8 +185,11 @@ class MainActivity : AppCompatActivity() {
                 )
                 usersRef.child(username).setValue(userMap)
                     .addOnSuccessListener {
+                        // Save credentials to SharedPreferences
+                        saveUserCredentials(username, name, email, phone)
+
                         Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
-                        showScreen2()
+                        showScreen4() // Take them directly to home screen after registration
                     }
                     .addOnFailureListener { e ->
                         Toast.makeText(this, "Signup failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -141,6 +198,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun logout() {
+        clearUserCredentials()
+        showScreen2() // Go back to login screen
+    }
     private fun showScreen4() {
         setContentView(R.layout.screen4) // Screen 4 layout
 
@@ -174,6 +235,10 @@ class MainActivity : AppCompatActivity() {
         gotoContacts.setOnClickListener {
             showScreen18()
         }
+
+
+
+
     }
 
     private fun showScreen5() {
@@ -324,6 +389,18 @@ class MainActivity : AppCompatActivity() {
         gotoContacts.setOnClickListener {
             showScreen18()
         }
+
+        val username = sharedPreferences.getString(KEY_USERNAME, "")
+        val name = sharedPreferences.getString(KEY_NAME, "")
+        val email = sharedPreferences.getString(KEY_EMAIL, "")
+        val phone = sharedPreferences.getString(KEY_PHONE, "")
+
+        // Add code to update UI with this information
+        // For example:
+        findViewById<TextView>(R.id.username).text = name
+        // findViewById<TextView>(R.id.profileUsername).text = username
+        // findViewById<TextView>(R.id.profileEmail).text = email
+        // findViewById<TextView>(R.id.profilePhone).text = phone
     }
 
     private fun showScreen11() {

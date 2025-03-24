@@ -15,14 +15,18 @@
         <!-- Search Bar -->
 
         <EditText
+            android:id="@+id/searchEditText"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:hint="Search"
             android:paddingHorizontal="12dp"
             android:background="@color/white"
             android:textSize="14sp"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
             android:layout_weight="1"/>
         <ImageView
+            android:id="@+id/searchButton"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_marginTop="5dp"
@@ -42,109 +46,45 @@
         android:paddingLeft="25dp"/>
 
     <ScrollView
+        android:id="@+id/scrollContainer"
         android:layout_below="@id/recentText"
         android:padding="16dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_above="@id/bottomNavigation"
         android:scrollbars="none"
         android:layout_marginTop="12dp">
 
+        <!-- Container for recent searches -->
         <LinearLayout
+            android:id="@+id/recentSearchesContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-
-            <!-- Chat Item 1 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingVertical="4dp"
-                android:layout_marginBottom="8dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-
-
-                <!-- User Name -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Alfredo Lipshutz"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:layout_weight="1"
-                    android:layout_marginStart="12dp"/>
-
-                <!-- Camera Icon -->
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:paddingRight="10dp"
-                    android:src="@drawable/cross_icon"
-                    />
-            </LinearLayout>
-
-            <!-- Chat Item 2 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingVertical="4dp"
-                android:layout_marginBottom="8dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Emily James"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:layout_weight="1"
-                    android:layout_marginStart="12dp"/>
-
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:paddingRight="10dp"
-                    android:src="@drawable/cross_icon"
-                    />
-            </LinearLayout>
-
-            <!-- Chat Item 3 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingVertical="4dp"
-                android:layout_marginBottom="8dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Lily Thomas"
-                    android:textSize="16sp"
-                    android:textColor="@android:color/black"
-                    android:layout_weight="1"
-                    android:layout_marginStart="12dp"/>
-
-                <ImageView
-                    android:layout_width="25dp"
-                    android:layout_height="25dp"
-                    android:paddingRight="10dp"
-                    android:src="@drawable/cross_icon"
-                    />
-            </LinearLayout>
-
-
-
+            <!-- Recent searches will be added here programmatically -->
         </LinearLayout>
     </ScrollView>
 
+    <!-- Container for search results (initially hidden) -->
+    <ScrollView
+        android:id="@+id/resultsScrollContainer"
+        android:layout_below="@id/recentText"
+        android:padding="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@id/bottomNavigation"
+        android:scrollbars="none"
+        android:layout_marginTop="12dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/searchResultsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <!-- Search results will be added here programmatically -->
+        </LinearLayout>
+    </ScrollView>
 
     <!-- Bottom Navigation -->
     <LinearLayout
@@ -156,8 +96,6 @@
         android:background="#FFFFFF"
         android:padding="8dp"
         android:gravity="center">
-
-
 
         <ImageButton
             android:id="@+id/HomePage"
@@ -184,21 +122,17 @@
             android:contentDescription="Search"
             />
 
-
         <ImageButton
             android:id="@+id/PostPage"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:padding="4dp"
-
             android:src="@drawable/add_post_icon"
             android:scaleType="centerInside"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="AddPost"
             />
-
-
 
         <ImageButton
             android:id="@+id/ProfilePage"
@@ -224,10 +158,6 @@
             android:layout_weight="1"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Contacts"
-
             />
-
     </LinearLayout>
-
-
 </RelativeLayout>

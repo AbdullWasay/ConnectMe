@@ -36,7 +36,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/edit_icon"
-/>
+            />
     </LinearLayout>
 
     <!-- Tabs (DMs & Requests) -->
@@ -68,17 +68,12 @@
                     android:layout_height="wrap_content"
                     android:text="DMs"
                     android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/brown"
+                    android:textColor="#999999"
                     android:gravity="center"
                     android:paddingBottom="4dp"/>
 
                 <!-- Underline only under text -->
-                <View
-                    android:id="@+id/tab_dms_underline"
-                    android:layout_width="80dp"
-                    android:layout_height="2dp"
-                    android:background="@android:color/black"/>
+
             </LinearLayout>
         </LinearLayout>
 
@@ -96,11 +91,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Requests"
+                android:textStyle="bold"
+                android:textColor="@color/brown"
                 android:textSize="18sp"
-                android:textColor="#999999"
                 android:gravity="center"
                 android:paddingBottom="4dp"/>
-
+            <View
+                android:id="@+id/tab_dms_underline"
+                android:layout_width="80dp"
+                android:layout_height="2dp"
+                android:background="@android:color/black"/>
 
         </LinearLayout>
     </LinearLayout>
@@ -111,9 +111,10 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginTop="20dp">
-    <!-- Search Bar -->
+        <!-- Search Bar -->
 
         <EditText
+            android:id="@+id/searchEditText"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:hint="Search for DMs"
@@ -122,6 +123,7 @@
             android:textSize="14sp"
             android:layout_weight="1"/>
         <ImageView
+            android:id="@+id/searchButton"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_marginTop="5dp"
@@ -136,6 +138,7 @@
         android:layout_marginTop="12dp">
 
         <LinearLayout
+            android:id="@+id/requestsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">

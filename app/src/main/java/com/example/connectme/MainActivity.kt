@@ -55,6 +55,8 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_NAME = "name"
         private const val KEY_EMAIL = "email"
         private const val KEY_PHONE = "phone"
+        private const val KEY_BIO = "bio"  // Add this for bio
+        private const val PROFILE_IMAGE_REQUEST = 3  // Add this for profile image selection
     }
 
 
@@ -65,31 +67,32 @@ class MainActivity : AppCompatActivity() {
         sharedPreferences = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
         setContentView(R.layout.activity_main) // Screen 1 layout
-
-        if (isLoggedIn()) {
-            // Skip to home screen
-            Handler(Looper.getMainLooper()).postDelayed({
-                showScreen4()
-            }, 1000)
-        } else {
-            // Show login screen after splash
-            Handler(Looper.getMainLooper()).postDelayed({
-                showScreen2()
-            }, 3000)
-        }
+        showScreen2()
+//        if (isLoggedIn()) {
+//            // Skip to home screen
+//            Handler(Looper.getMainLooper()).postDelayed({
+//                showScreen4()
+//            }, 1000)
+//        } else {
+//            // Show login screen after splash
+//            Handler(Looper.getMainLooper()).postDelayed({
+//                showScreen2()
+//            }, 3000)
+//        }
     }
 
     private fun isLoggedIn(): Boolean {
         return sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)
     }
 
-    private fun saveUserCredentials(username: String, name: String, email: String, phone: String) {
+    private fun saveUserCredentials(username: String, name: String, email: String, phone: String, bio: String = "") {
         val editor = sharedPreferences.edit()
         editor.putBoolean(KEY_IS_LOGGED_IN, true)
         editor.putString(KEY_USERNAME, username)
         editor.putString(KEY_NAME, name)
         editor.putString(KEY_EMAIL, email)
         editor.putString(KEY_PHONE, phone)
+        editor.putString(KEY_BIO, bio)
         editor.apply()
     }
 
@@ -259,12 +262,356 @@ class MainActivity : AppCompatActivity() {
             showScreen4()
         }
 
+        val requestspage = findViewById<LinearLayout>(R.id.requests_container)
+        requestspage.setOnClickListener {
+            showScreen19()
+        }
+
         //Open Chat
         val chat = findViewById<LinearLayout>(R.id.chat2)
         chat.setOnClickListener {
             showScreen6()
         }
     }
+    private fun showScreen19() {
+        setContentView(R.layout.screen19request)
+
+        // Get references to UI elements
+        val backButton = findViewById<ImageView>(R.id.BackButtonm)
+        val dmsTab = findViewById<LinearLayout>(R.id.dms_container)
+        val requestsTab = findViewById<LinearLayout>(R.id.requests_container)
+        val searchEditText = findViewById<EditText>(R.id.searchEditText)
+        val searchButton = findViewById<ImageView>(R.id.searchButton)
+        val requestsContainer = findViewById<LinearLayout>(R.id.requestsContainer)
+
+        // Set up back button
+        backButton.setOnClickListener {
+            showScreen4()
+        }
+
+        // Set up tab navigation
+        dmsTab.setOnClickListener {
+            showScreen5() // Navigate to DMs screen
+        }
+
+        // Load follow requests
+        loadFollowRequests(requestsContainer)
+
+        // Set up search functionality if needed
+        searchButton.setOnClickListener {
+            val query = searchEditText.text.toString().trim()
+            if (query.isNotEmpty()) {
+                // Filter requests by query
+                filterRequests(query, requestsContainer)
+            } else {
+                // Reload all requests
+                loadFollowRequests(requestsContainer)
+            }
+        }
+    }
+
+
+    // Function to load follow requests from Firebase
+    private fun loadFollowRequests(container: LinearLayout) {
+        // Clear existing views
+        container.removeAllViews()
+
+        // Show loading indicator
+        val loadingText = TextView(this).apply {
+            text = "Loading requests..."
+            textSize = 16f
+            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+        }
+        container.addView(loadingText)
+
+        // Get current user's username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "")
+        if (currentUsername.isNullOrEmpty()) {
+            loadingText.text = "You need to be logged in to view requests"
+            return
+        }
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val requestsRef = database.getReference("FollowRequests").child(currentUsername)
+
+        // Query for follow requests
+        requestsRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                // Clear the container
+                container.removeAllViews()
+
+                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                    // No requests found
+                    val noRequestsText = TextView(this@MainActivity).apply {
+                        text = "No follow requests"
+                        textSize = 16f
+                        setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                        setTextColor(android.graphics.Color.GRAY)
+                    }
+                    container.addView(noRequestsText)
+                    return
+                }
+
+                // Process each request
+                for (requestSnapshot in snapshot.children) {
+                    val fromUsername = requestSnapshot.key ?: continue
+                    val timestamp = requestSnapshot.child("timestamp").value as? String ?: ""
+
+                    // Get user info for the requester
+                    getUserInfo(fromUsername) { name, profilePicUrl ->
+                        // Create request item view
+                        val requestView = createRequestItemView(fromUsername, name, profilePicUrl, container)
+                        container.addView(requestView)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("FollowRequests", "Error loading requests: ${error.message}")
+
+                // Show error message
+                container.removeAllViews()
+                val errorText = TextView(this@MainActivity).apply {
+                    text = "Error loading requests: ${error.message}"
+                    textSize = 16f
+                    setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                    setTextColor(android.graphics.Color.RED)
+                }
+                container.addView(errorText)
+            }
+        })
+    }
+
+
+    // Function to create a request item view
+    private fun createRequestItemView(username: String, name: String, profilePicUrl: String, container: LinearLayout): View {
+        // Create a horizontal layout for the request item
+        val itemLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        // Create profile image
+        val profileImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+        }
+
+        // Load profile image
+        if (profilePicUrl.isNotEmpty()) {
+            Glide.with(this)
+                .load(profilePicUrl)
+                .centerCrop()
+                .into(profileImageView)
+        } else {
+            // Use a default profile image
+            profileImageView.setImageResource(R.drawable.profilepic1)
+        }
+
+        // Create text view for the username
+        val usernameTextView = TextView(this).apply {
+            text = name
+            textSize = 16f
+            setTextColor(android.graphics.Color.BLACK)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+            setPadding(12.dpToPx(), 0, 0, 0)
+        }
+
+        // Create buttons container
+        val buttonsContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        // Create accept button
+        val acceptButton = Button(this).apply {
+            text = "Accept"
+            textSize = 12f
+            setPadding(12.dpToPx(), 4.dpToPx(), 12.dpToPx(), 4.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.btn_default)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = 8.dpToPx()
+            }
+        }
+
+        // Create reject button
+        val rejectButton = Button(this).apply {
+            text = "Reject"
+            textSize = 12f
+            setPadding(12.dpToPx(), 4.dpToPx(), 12.dpToPx(), 4.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.btn_default)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        // Set click listeners for buttons
+        acceptButton.setOnClickListener {
+            acceptFollowRequest(username, container)
+        }
+
+        rejectButton.setOnClickListener {
+            rejectFollowRequest(username, container)
+        }
+
+        // Add buttons to container
+        buttonsContainer.addView(acceptButton)
+        buttonsContainer.addView(rejectButton)
+
+        // Add views to the main layout
+        itemLayout.addView(profileImageView)
+        itemLayout.addView(usernameTextView)
+        itemLayout.addView(buttonsContainer)
+
+        return itemLayout
+    }
+
+
+    // Function to accept a follow request
+    private fun acceptFollowRequest(fromUsername: String, container: LinearLayout) {
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername.isEmpty()) return
+
+        val database = FirebaseDatabase.getInstance()
+        val requestsRef = database.getReference("FollowRequests")
+        val followersRef = database.getReference("Followers")
+        val followingRef = database.getReference("Following")
+
+        // Show loading toast
+        Toast.makeText(this, "Accepting request...", Toast.LENGTH_SHORT).show()
+
+        // Add to followers list (fromUsername is now following currentUsername)
+        followersRef.child(currentUsername).child(fromUsername).setValue(true)
+            .addOnSuccessListener {
+                // Add to following list (currentUsername is now followed by fromUsername)
+                followingRef.child(fromUsername).child(currentUsername).setValue(true)
+                    .addOnSuccessListener {
+                        // Remove the request
+                        requestsRef.child(currentUsername).child(fromUsername).removeValue()
+                            .addOnSuccessListener {
+                                Toast.makeText(this, "Follow request accepted", Toast.LENGTH_SHORT).show()
+                                // Reload the requests
+                                loadFollowRequests(container)
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(this, "Error removing request: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(this, "Error updating following: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Error updating followers: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // Function to reject a follow request
+    private fun rejectFollowRequest(fromUsername: String, container: LinearLayout) {
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername.isEmpty()) return
+
+        val database = FirebaseDatabase.getInstance()
+        val requestsRef = database.getReference("FollowRequests")
+
+        // Show loading toast
+        Toast.makeText(this, "Rejecting request...", Toast.LENGTH_SHORT).show()
+
+        // Remove the request
+        requestsRef.child(currentUsername).child(fromUsername).removeValue()
+            .addOnSuccessListener {
+                Toast.makeText(this, "Follow request rejected", Toast.LENGTH_SHORT).show()
+                // Reload the requests
+                loadFollowRequests(container)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Error rejecting request: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // Function to filter requests by search query
+    private fun filterRequests(query: String, container: LinearLayout) {
+        // This is a simple client-side filtering
+        // For a real app, you might want to do this filtering on the server
+
+        // Get all request items
+        val requestItems = ArrayList<View>()
+        for (i in 0 until container.childCount) {
+            requestItems.add(container.getChildAt(i))
+        }
+
+        // Clear container
+        container.removeAllViews()
+
+        // Filter and add matching items
+        var matchFound = false
+        for (item in requestItems) {
+            if (item is LinearLayout) {
+                // Find the username TextView (second child)
+                val usernameTextView = item.getChildAt(1) as? TextView
+                val username = usernameTextView?.text?.toString() ?: ""
+
+                if (username.contains(query, ignoreCase = true)) {
+                    container.addView(item)
+                    matchFound = true
+                }
+            }
+        }
+
+        // Show no results message if needed
+        if (!matchFound) {
+            val noResultsText = TextView(this).apply {
+                text = "No matching requests found"
+                textSize = 16f
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                setTextColor(android.graphics.Color.GRAY)
+            }
+            container.addView(noResultsText)
+        }
+    }
+    // Function to get user info from Firebase
+    private fun getUserInfo(username: String, callback: (name: String, profilePicUrl: String) -> Unit) {
+        val database = FirebaseDatabase.getInstance()
+        val usersRef = database.getReference("Users").child(username)
+
+        usersRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    val name = snapshot.child("name").value as? String ?: username
+                    val profilePicUrl = snapshot.child("profilePicUrl").value as? String ?: ""
+                    callback(name, profilePicUrl)
+                } else {
+                    callback(username, "")
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("UserInfo", "Error getting user info: ${error.message}")
+                callback(username, "")
+            }
+        })
+    }
+
 
     private fun showScreen6() {
         setContentView(R.layout.screen6) // Set layout for Screen 6
@@ -538,46 +885,649 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Update the showScreen11 method to load and display followers
     private fun showScreen11() {
-        setContentView(R.layout.screen11) // Screen 4 layout
+        setContentView(R.layout.screen11)
 
+        // Set up back button
         val backButton = findViewById<ImageView>(R.id.BackButton)
         backButton.setOnClickListener {
             showScreen10()
         }
 
-        val followingPage = findViewById<LinearLayout>(R.id.FollowingTab)
-        followingPage.setOnClickListener {
+        // Set up tab navigation
+        val followingTab = findViewById<LinearLayout>(R.id.FollowingTab)
+        followingTab.setOnClickListener {
             showScreen12()
+        }
+
+        // Get references to UI elements
+        val followersCountText = findViewById<TextView>(R.id.tabfollowing)
+        val searchEditText = findViewById<EditText>(R.id.searchEditText)
+        val searchButton = findViewById<ImageView>(R.id.searchButton)
+        val followersContainer = findViewById<LinearLayout>(R.id.followersContainer)
+
+        // Get current username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "")
+        if (currentUsername.isNullOrEmpty()) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Load followers
+        loadFollowers(currentUsername, followersContainer, followersCountText)
+
+        // Set up search functionality
+        searchButton?.setOnClickListener {
+            val query = searchEditText?.text.toString().trim()
+            if (query.isNotEmpty()) {
+                filterFollowers(query, followersContainer)
+            } else {
+                // Reload all followers
+                loadFollowers(currentUsername, followersContainer, followersCountText)
+            }
         }
     }
 
+    // Update the showScreen12 method to load and display following
     private fun showScreen12() {
-        setContentView(R.layout.screen12) // Screen 4 layout
+        setContentView(R.layout.screen12)
 
+        // Set up back button
         val backButton = findViewById<ImageView>(R.id.BackButton)
         backButton.setOnClickListener {
             showScreen10()
         }
 
-        val followersPage = findViewById<LinearLayout>(R.id.FollowersTab)
-        followersPage.setOnClickListener {
+        // Set up tab navigation
+        val followersTab = findViewById<LinearLayout>(R.id.FollowersTab)
+        followersTab.setOnClickListener {
             showScreen11()
         }
+
+        // Get references to UI elements
+        val followingCountText = findViewById<TextView>(R.id.tab_requests)
+        val searchEditText = findViewById<EditText>(R.id.searchEditText)
+        val searchButton = findViewById<ImageView>(R.id.searchButton)
+        val followingContainer = findViewById<LinearLayout>(R.id.followingContainer)
+
+        // Get current username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "")
+        if (currentUsername.isNullOrEmpty()) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Load following
+        loadFollowing(currentUsername, followingContainer, followingCountText)
+
+        // Set up search functionality
+        searchButton?.setOnClickListener {
+            val query = searchEditText?.text.toString().trim()
+            if (query.isNotEmpty()) {
+                filterFollowing(query, followingContainer)
+            } else {
+                // Reload all following
+                loadFollowing(currentUsername, followingContainer, followingCountText)
+            }
+        }
+    }
+
+    // Function to load followers from Firebase
+    private fun loadFollowers(username: String, container: LinearLayout, countTextView: TextView) {
+        // Clear existing views
+        container.removeAllViews()
+
+        // Show loading indicator
+        val loadingText = TextView(this).apply {
+            text = "Loading followers..."
+            textSize = 16f
+            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+        }
+        container.addView(loadingText)
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val followersRef = database.getReference("Followers").child(username)
+
+        // Query for followers
+        followersRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                // Clear the container
+                container.removeAllViews()
+
+                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                    // No followers found
+                    val noFollowersText = TextView(this@MainActivity).apply {
+                        text = "No followers yet"
+                        textSize = 16f
+                        setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                        setTextColor(android.graphics.Color.GRAY)
+                    }
+                    container.addView(noFollowersText)
+                    countTextView.text = "0 Followers"
+                    return
+                }
+
+                // Update followers count
+                countTextView.text = "${snapshot.childrenCount} Followers"
+
+                // Process each follower
+                for (followerSnapshot in snapshot.children) {
+                    val followerUsername = followerSnapshot.key ?: continue
+
+                    // Get user info for the follower
+                    getUserInfo(followerUsername) { name, profilePicUrl ->
+                        // Create follower item view
+                        val followerView = createFollowerItemView(followerUsername, name, profilePicUrl)
+                        container.addView(followerView)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Followers", "Error loading followers: ${error.message}")
+
+                // Show error message
+                container.removeAllViews()
+                val errorText = TextView(this@MainActivity).apply {
+                    text = "Error loading followers: ${error.message}"
+                    textSize = 16f
+                    setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                    setTextColor(android.graphics.Color.RED)
+                }
+                container.addView(errorText)
+            }
+        })
+    }
+
+    // Function to load following from Firebase
+    private fun loadFollowing(username: String, container: LinearLayout, countTextView: TextView) {
+        // Clear existing views
+        container.removeAllViews()
+
+        // Show loading indicator
+        val loadingText = TextView(this).apply {
+            text = "Loading following..."
+            textSize = 16f
+            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+        }
+        container.addView(loadingText)
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val followingRef = database.getReference("Following").child(username)
+
+        // Query for following
+        followingRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                // Clear the container
+                container.removeAllViews()
+
+                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                    // Not following anyone
+                    val noFollowingText = TextView(this@MainActivity).apply {
+                        text = "Not following anyone yet"
+                        textSize = 16f
+                        setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                        setTextColor(android.graphics.Color.GRAY)
+                    }
+                    container.addView(noFollowingText)
+                    countTextView.text = "0 Following"
+                    return
+                }
+
+                // Update following count
+                countTextView.text = "${snapshot.childrenCount} Following"
+
+                // Process each following
+                for (followingSnapshot in snapshot.children) {
+                    val followingUsername = followingSnapshot.key ?: continue
+
+                    // Get user info for the following
+                    getUserInfo(followingUsername) { name, profilePicUrl ->
+                        // Create following item view
+                        val followingView = createFollowingItemView(followingUsername, name, profilePicUrl)
+                        container.addView(followingView)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Following", "Error loading following: ${error.message}")
+
+                // Show error message
+                container.removeAllViews()
+                val errorText = TextView(this@MainActivity).apply {
+                    text = "Error loading following: ${error.message}"
+                    textSize = 16f
+                    setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                    setTextColor(android.graphics.Color.RED)
+                }
+                container.addView(errorText)
+            }
+        })
+    }
+
+    // Function to create a follower item view
+    private fun createFollowerItemView(username: String, name: String, profilePicUrl: String): View {
+        // Create a horizontal layout for the follower item
+        val itemLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        // Create profile image
+        val profileImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+        }
+
+        // Load profile image
+        if (profilePicUrl.isNotEmpty()) {
+            Glide.with(this)
+                .load(profilePicUrl)
+                .centerCrop()
+                .into(profileImageView)
+        } else {
+            // Use a default profile image
+            profileImageView.setImageResource(R.drawable.profilepic1)
+        }
+
+        // Create text view for the username
+        val nameTextView = TextView(this).apply {
+            text = name
+            textSize = 16f
+            setTextColor(android.graphics.Color.BLACK)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+            setPadding(12.dpToPx(), 0, 0, 0)
+        }
+
+        // Create message button
+        val messageButton = ImageView(this).apply {
+            setImageResource(R.drawable.message_icon)
+            layoutParams = LinearLayout.LayoutParams(
+                32.dpToPx(),
+                32.dpToPx()
+            )
+        }
+
+        // Set click listener for the message button
+        messageButton.setOnClickListener {
+            // Start a chat with this user
+            startChatWithUser(username)
+        }
+
+        // Add views to the main layout
+        itemLayout.addView(profileImageView)
+        itemLayout.addView(nameTextView)
+        itemLayout.addView(messageButton)
+
+        // Set click listener on the layout to view the user's profile
+        itemLayout.setOnClickListener {
+            viewUserProfile(username)
+        }
+
+        return itemLayout
+    }
+
+    // Function to create a following item view
+    private fun createFollowingItemView(username: String, name: String, profilePicUrl: String): View {
+        // Create a horizontal layout for the following item
+        val itemLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        // Create profile image
+        val profileImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+        }
+
+        // Load profile image
+        if (profilePicUrl.isNotEmpty()) {
+            Glide.with(this)
+                .load(profilePicUrl)
+                .centerCrop()
+                .into(profileImageView)
+        } else {
+            // Use a default profile image
+            profileImageView.setImageResource(R.drawable.profilepic1)
+        }
+
+        // Create text view for the username
+        val nameTextView = TextView(this).apply {
+            text = name
+            textSize = 16f
+            setTextColor(android.graphics.Color.BLACK)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+            setPadding(12.dpToPx(), 0, 0, 0)
+        }
+
+        // Create message button
+        val messageButton = ImageView(this).apply {
+            setImageResource(R.drawable.message_icon)
+            layoutParams = LinearLayout.LayoutParams(
+                32.dpToPx(),
+                32.dpToPx()
+            )
+        }
+
+        // Set click listener for the message button
+        messageButton.setOnClickListener {
+            // Start a chat with this user
+            startChatWithUser(username)
+        }
+
+        // Add views to the main layout
+        itemLayout.addView(profileImageView)
+        itemLayout.addView(nameTextView)
+        itemLayout.addView(messageButton)
+
+        // Set click listener on the layout to view the user's profile
+        itemLayout.setOnClickListener {
+            viewUserProfile(username)
+        }
+
+        return itemLayout
+    }
+
+    // Function to filter followers by search query
+    private fun filterFollowers(query: String, container: LinearLayout) {
+        // This is a simple client-side filtering
+        // For a real app, you might want to do this filtering on the server
+
+        // Get all follower items
+        val followerItems = ArrayList<View>()
+        for (i in 0 until container.childCount) {
+            followerItems.add(container.getChildAt(i))
+        }
+
+        // Clear container
+        container.removeAllViews()
+
+        // Filter and add matching items
+        var matchFound = false
+        for (item in followerItems) {
+            if (item is LinearLayout) {
+                // Find the name TextView (second child)
+                val nameTextView = item.getChildAt(1) as? TextView
+                val name = nameTextView?.text?.toString() ?: ""
+
+                if (name.contains(query, ignoreCase = true)) {
+                    container.addView(item)
+                    matchFound = true
+                }
+            }
+        }
+
+        // Show no results message if needed
+        if (!matchFound) {
+            val noResultsText = TextView(this).apply {
+                text = "No matching followers found"
+                textSize = 16f
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                setTextColor(android.graphics.Color.GRAY)
+            }
+            container.addView(noResultsText)
+        }
+    }
+
+    // Function to filter following by search query
+    private fun filterFollowing(query: String, container: LinearLayout) {
+        // This is a simple client-side filtering
+        // For a real app, you might want to do this filtering on the server
+
+        // Get all following items
+        val followingItems = ArrayList<View>()
+        for (i in 0 until container.childCount) {
+            followingItems.add(container.getChildAt(i))
+        }
+
+        // Clear container
+        container.removeAllViews()
+
+        // Filter and add matching items
+        var matchFound = false
+        for (item in followingItems) {
+            if (item is LinearLayout) {
+                // Find the name TextView (second child)
+                val nameTextView = item.getChildAt(1) as? TextView
+                val name = nameTextView?.text?.toString() ?: ""
+
+                if (name.contains(query, ignoreCase = true)) {
+                    container.addView(item)
+                    matchFound = true
+                }
+            }
+        }
+
+        // Show no results message if needed
+        if (!matchFound) {
+            val noResultsText = TextView(this).apply {
+                text = "No matching users found"
+                textSize = 16f
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                setTextColor(android.graphics.Color.GRAY)
+            }
+            container.addView(noResultsText)
+        }
+    }
+
+    // Function to start a chat with a user
+    private fun startChatWithUser(username: String) {
+        // For now, just show a toast
+        Toast.makeText(this, "Starting chat with $username", Toast.LENGTH_SHORT).show()
+
+        // TODO: Implement actual chat functionality
+        // This would typically involve navigating to the chat screen
+        // and setting up a chat session with the selected user
     }
 
     private fun showScreen13() {
-        setContentView(R.layout.screen13) // Screen 4 layout
+        setContentView(R.layout.screen13)
 
+        // Get user data from SharedPreferences
+        val username = sharedPreferences.getString(KEY_USERNAME, "")
+        val name = sharedPreferences.getString(KEY_NAME, "")
+        val email = sharedPreferences.getString(KEY_EMAIL, "")
+        val phone = sharedPreferences.getString(KEY_PHONE, "")
+        val bio = sharedPreferences.getString(KEY_BIO, "Just an average 14 year old")  // Default bio if not set
+
+        // Log the current user data for debugging
+        Log.d("EditProfile", "Current user data: username=$username, name=$name, email=$email, phone=$phone, bio=$bio")
+
+        // Find all the EditText and TextView fields
+        val nameEditText = findViewById<EditText>(R.id.nameEditText)
+        val usernameEditText = findViewById<EditText>(R.id.usernameEditText)
+        val phoneEditText = findViewById<EditText>(R.id.phoneEditText)
+        val bioTextView = findViewById<TextView>(R.id.textView)
+        val profileNameTextView = findViewById<TextView>(R.id.profileNameTextView)
+
+        // Set the current values
+        nameEditText.setText(name)
+        usernameEditText.setText(username)
+        phoneEditText.setText(phone)
+        bioTextView.text = bio
+        profileNameTextView.text = name
+
+        // Handle the Done button click
         val doneEditing = findViewById<TextView>(R.id.DoneEditing)
         doneEditing.setOnClickListener {
+            // Get the updated values
+            val updatedName = nameEditText.text.toString()
+            val updatedUsername = usernameEditText.text.toString()
+            val updatedPhone = phoneEditText.text.toString()
+            val updatedBio = bioTextView.text.toString()
+
+            Log.d("EditProfile", "Updated values: name=$updatedName, username=$updatedUsername, phone=$updatedPhone, bio=$updatedBio")
+
+            // Validate input
+            if (updatedName.isEmpty() || updatedUsername.isEmpty() || updatedPhone.isEmpty()) {
+                Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Show a loading indicator
+            Toast.makeText(this, "Updating profile...", Toast.LENGTH_SHORT).show()
+
+            // For simplicity, let's just update the SharedPreferences directly and go back to screen 10
+            // This will help us determine if the issue is with Firebase or something else
+            saveUserCredentials(username ?: "", updatedName, email ?: "", updatedPhone, updatedBio)
+            Toast.makeText(this, "Profile updated in SharedPreferences", Toast.LENGTH_SHORT).show()
+
+            // Now let's try to update Firebase
+            try {
+                val database = FirebaseDatabase.getInstance()
+                val usersRef = database.getReference("Users")
+
+                Log.d("EditProfile", "Updating Firebase at path: Users/$username")
+
+                // Create a map of fields to update
+                val updates = HashMap<String, Any>()
+                updates["name"] = updatedName
+                updates["phone"] = updatedPhone
+                updates["bio"] = updatedBio
+
+                // Update in Firebase with more detailed callbacks
+                usersRef.child(username ?: "").updateChildren(updates)
+                    .addOnSuccessListener {
+                        Log.d("EditProfile", "Firebase update successful")
+                        Toast.makeText(this, "Profile updated successfully", Toast.LENGTH_SHORT).show()
+                        showScreen10()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("EditProfile", "Firebase update failed: ${e.message}", e)
+                        Toast.makeText(this, "Firebase update failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        // Still go to screen 10 since we updated SharedPreferences
+                        showScreen10()
+                    }
+                    .addOnCompleteListener {
+                        Log.d("EditProfile", "Firebase update operation completed")
+                    }
+            } catch (e: Exception) {
+                Log.e("EditProfile", "Exception during Firebase update: ${e.message}", e)
+                Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                // Still go to screen 10 since we updated SharedPreferences
+                showScreen10()
+            }
+        }
+
+        // Handle profile image change
+        val cameraIcon = findViewById<ImageView>(R.id.cameraIcon)
+        cameraIcon.setOnClickListener {
+            // Open image picker
+            if (checkAndRequestPermissions()) {
+                val intent = Intent(Intent.ACTION_PICK)
+                intent.type = "image/*"
+                startActivityForResult(intent, PROFILE_IMAGE_REQUEST)
+            }
+        }
+    }
+    private fun updateUserProfile(username: String, name: String, phone: String, email: String, bio: String) {
+        val database = FirebaseDatabase.getInstance()
+        val usersRef = database.getReference("Users")
+
+        // Create a map of fields to update
+        val updates = HashMap<String, Any>()
+        updates["name"] = name
+        updates["phone"] = phone
+        updates["bio"] = bio
+
+        // Update in Firebase
+        usersRef.child(username).updateChildren(updates).addOnSuccessListener {
+            // Update in SharedPreferences
+            saveUserCredentials(username, name, email, phone, bio)
+            Toast.makeText(this, "Profile updated successfully", Toast.LENGTH_SHORT).show()
+
+            // Navigate back to profile screen (screen 10)
             showScreen10()
+        }.addOnFailureListener { e ->
+            Toast.makeText(this, "Failed to update profile: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    private fun checkUsernameAvailability(newUsername: String, oldUsername: String, name: String, phone: String, email: String, bio: String) {
+        val database = FirebaseDatabase.getInstance()
+        val usersRef = database.getReference("Users")
+
+        usersRef.child(newUsername).get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                Toast.makeText(this, "Username already taken", Toast.LENGTH_SHORT).show()
+            } else {
+                // Username is available, update user data with new username
+                // First, copy the data to the new username node
+                usersRef.child(oldUsername).get().addOnSuccessListener { oldUserData ->
+                    if (oldUserData.exists()) {
+                        // Create a map of the user data to copy
+                        val userData = HashMap<String, Any>()
+                        for (child in oldUserData.children) {
+                            userData[child.key!!] = child.value!!
+                        }
+
+                        // Update with new values
+                        userData["name"] = name
+                        userData["username"] = newUsername
+                        userData["phone"] = phone
+                        userData["bio"] = bio
+
+                        // Save to new username node
+                        usersRef.child(newUsername).setValue(userData).addOnSuccessListener {
+                            // Delete the old username node
+                            usersRef.child(oldUsername).removeValue().addOnSuccessListener {
+                                // Update SharedPreferences
+                                saveUserCredentials(newUsername, name, email, phone, bio)
+                                Toast.makeText(this, "Profile updated successfully", Toast.LENGTH_SHORT).show()
+
+// Navigate back to profile screen (screen 10)
+                                showScreen10()   }
+                        }.addOnFailureListener { e ->
+                            Toast.makeText(this, "Failed to update profile: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+        }.addOnFailureListener { e ->
+            Toast.makeText(this, "Error checking username: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun showScreen14() {
-        setContentView(R.layout.screen14) // Screen 4 layout
 
+    private fun showScreen14() {
+        setContentView(R.layout.screen14)
+
+        // Get references to UI elements
+        val searchEditText = findViewById<EditText>(R.id.searchEditText)
+        val searchButton = findViewById<ImageView>(R.id.searchButton)
+        val recentSearchesContainer = findViewById<LinearLayout>(R.id.recentSearchesContainer)
+        val recentSearchesText = findViewById<TextView>(R.id.recentText)
+        val searchResultsContainer = findViewById<LinearLayout>(R.id.searchResultsContainer)
+        val resultsScrollContainer = findViewById<ScrollView>(R.id.resultsScrollContainer)
+        val recentScrollContainer = findViewById<ScrollView>(R.id.scrollContainer)
+
+        // Set up navigation buttons
         val gotoHome = findViewById<ImageButton>(R.id.HomePage)
         gotoHome.setOnClickListener {
             showScreen4()
@@ -598,6 +1548,483 @@ class MainActivity : AppCompatActivity() {
         gotoContacts.setOnClickListener {
             showScreen18()
         }
+
+        // Load recent searches from SharedPreferences
+        loadRecentSearches(recentSearchesContainer)
+
+        // Set up search functionality
+        searchButton.setOnClickListener {
+            val searchQuery = searchEditText.text.toString().trim()
+            if (searchQuery.isNotEmpty()) {
+                // Show loading indicator
+                Toast.makeText(this, "Searching for users...", Toast.LENGTH_SHORT).show()
+
+                // Add to recent searches
+                addToRecentSearches(searchQuery)
+
+                // Perform search
+                searchUsers(
+                    searchQuery,
+                    searchResultsContainer,
+                    recentSearchesContainer,
+                    recentSearchesText,
+                    resultsScrollContainer,
+                    recentScrollContainer
+                )
+            } else {
+                Toast.makeText(this, "Please enter a username to search", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Also trigger search when user presses enter/done on keyboard
+        searchEditText.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                searchButton.performClick()
+                return@setOnEditorActionListener true
+            }
+            false
+        }
+    }
+
+    // Function to search for users in Firebase
+    private fun searchUsers(
+        query: String,
+        resultsContainer: LinearLayout,
+        recentSearchesContainer: LinearLayout,
+        recentSearchesText: TextView,
+        resultsScrollContainer: ScrollView,
+        recentScrollContainer: ScrollView
+    ) {
+        // Clear previous results
+        resultsContainer.removeAllViews()
+
+        // Show results container, hide recent searches
+        resultsScrollContainer.visibility = View.VISIBLE
+        recentScrollContainer.visibility = View.GONE
+        recentSearchesText.text = "Search Results"
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val usersRef = database.getReference("Users")
+
+        Log.d("SearchUsers", "Starting search for query: $query")
+
+        // Perform the search
+        usersRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                Log.d("SearchUsers", "Data snapshot received, children count: ${snapshot.childrenCount}")
+
+                var resultsFound = false
+
+                // Debug: Print all users in the database
+                for (userSnapshot in snapshot.children) {
+                    val username = userSnapshot.key
+                    val userData = userSnapshot.value as? Map<*, *>
+                    val name = userData?.get("name")?.toString() ?: "Unknown"
+
+                    Log.d("SearchUsers", "User in database: username=$username, name=$name")
+                }
+
+                // Now search for matching users
+                for (userSnapshot in snapshot.children) {
+                    val username = userSnapshot.key ?: continue
+                    val userData = userSnapshot.value as? Map<*, *> ?: continue
+                    val name = userData["name"]?.toString() ?: "Unknown"
+
+                    Log.d("SearchUsers", "Checking user: username=$username, name=$name")
+
+                    // Check if username or name contains the search query (case-insensitive)
+                    if (username.contains(query, ignoreCase = true) ||
+                        name.contains(query, ignoreCase = true)) {
+
+                        Log.d("SearchUsers", "Match found: username=$username, name=$name")
+
+                        // Create a user item view
+                        val userItemView = createUserItemView(username, name)
+                        resultsContainer.addView(userItemView)
+                        resultsFound = true
+                    }
+                }
+
+                if (!resultsFound) {
+                    // No results found
+                    Log.d("SearchUsers", "No results found for query: $query")
+
+                    val noResultsText = TextView(this@MainActivity).apply {
+                        text = "No users found matching '$query'"
+                        textSize = 16f
+                        setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                        setTextColor(android.graphics.Color.GRAY)
+                    }
+                    resultsContainer.addView(noResultsText)
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("SearchUsers", "Search cancelled with error: ${error.message}")
+
+                Toast.makeText(this@MainActivity, "Search failed: ${error.message}",
+                    Toast.LENGTH_SHORT).show()
+
+                // Show recent searches again if search fails
+                resultsScrollContainer.visibility = View.GONE
+                recentScrollContainer.visibility = View.VISIBLE
+                recentSearchesText.text = "Recent Searches"
+            }
+        })
+    }
+
+    // Function to create a user item view for search results
+    // Function to create a user item view for search results with a Follow button
+    private fun createUserItemView(username: String, name: String): View {
+        // Create a horizontal LinearLayout
+        val userItemLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        // Create profile image (placeholder)
+        val profileImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(40.dpToPx(), 40.dpToPx())
+            setImageResource(R.drawable.profile_pictures_border) // Use a placeholder image
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+
+        // Create text container for name and username
+        val textContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+            setPadding(16.dpToPx(), 0, 0, 0)
+        }
+
+        // Create name TextView
+        val nameTextView = TextView(this).apply {
+            text = name
+            textSize = 16f
+            setTextColor(android.graphics.Color.BLACK)
+        }
+
+        // Create username TextView
+        val usernameTextView = TextView(this).apply {
+            text = "@$username"
+            textSize = 14f
+            setTextColor(android.graphics.Color.GRAY)
+        }
+
+        // Add TextViews to the text container
+        textContainer.addView(nameTextView)
+        textContainer.addView(usernameTextView)
+
+        // Create Follow button
+        val followButton = Button(this).apply {
+            text = "Follow"
+            textSize = 12f
+            setPadding(12.dpToPx(), 4.dpToPx(), 12.dpToPx(), 4.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.btn_default)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        // Get current user's username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+
+        // Don't show follow button for the current user
+        if (username == currentUsername) {
+            followButton.visibility = View.GONE
+        } else {
+            // Check if already following this user
+            checkFollowStatus(currentUsername, username, followButton)
+        }
+
+        // Set click listener for the Follow button
+        followButton.setOnClickListener {
+            if (followButton.text == "Follow") {
+                // Send follow request
+                sendFollowRequest(currentUsername, username, followButton)
+            } else if (followButton.text == "Unfollow") {
+                // Unfollow the user
+                unfollowUser(currentUsername, username, followButton)
+            } else if (followButton.text == "Requested") {
+                // Cancel follow request
+                cancelFollowRequest(currentUsername, username, followButton)
+            }
+        }
+
+        // Add views to the main layout
+        userItemLayout.addView(profileImageView)
+        userItemLayout.addView(textContainer)
+        userItemLayout.addView(followButton)
+
+        // Set click listener on the layout (excluding the button) to view the user's profile
+        val clickListener = View.OnClickListener {
+            viewUserProfile(username)
+        }
+
+        profileImageView.setOnClickListener(clickListener)
+        textContainer.setOnClickListener(clickListener)
+
+        return userItemLayout
+    }
+    private fun checkFollowStatus(currentUsername: String, targetUsername: String, followButton: Button) {
+        if (currentUsername.isEmpty()) {
+            followButton.visibility = View.GONE
+            return
+        }
+
+        val database = FirebaseDatabase.getInstance()
+
+        // First check if there's a pending follow request
+        val requestsRef = database.getReference("FollowRequests")
+        requestsRef.child(targetUsername).child(currentUsername).addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    // There's a pending request
+                    followButton.text = "Requested"
+                    return
+                }
+
+                // If no pending request, check if already following
+                val followersRef = database.getReference("Followers")
+                followersRef.child(targetUsername).child(currentUsername).addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                    override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                        if (snapshot.exists()) {
+                            // Already following
+                            followButton.text = "Unfollow"
+                        } else {
+                            // Not following
+                            followButton.text = "Follow"
+                        }
+                    }
+
+                    override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                        Log.e("FollowStatus", "Error checking follow status: ${error.message}")
+                        followButton.text = "Follow"
+                    }
+                })
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("FollowStatus", "Error checking request status: ${error.message}")
+                followButton.text = "Follow"
+            }
+        })
+    }
+
+    // Function to send a follow request
+    private fun sendFollowRequest(fromUsername: String, toUsername: String, followButton: Button) {
+        if (fromUsername.isEmpty()) {
+            Toast.makeText(this, "You need to be logged in to follow users", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val database = FirebaseDatabase.getInstance()
+        val requestsRef = database.getReference("FollowRequests")
+
+        // Get current timestamp
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+        // Create request data
+        val requestData = mapOf(
+            "timestamp" to timestamp,
+            "status" to "pending"
+        )
+
+        // Add the request to Firebase
+        requestsRef.child(toUsername).child(fromUsername).setValue(requestData)
+            .addOnSuccessListener {
+                // Update button state
+                followButton.text = "Requested"
+                Toast.makeText(this, "Follow request sent", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to send request: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // Function to cancel a follow request
+    private fun cancelFollowRequest(fromUsername: String, toUsername: String, followButton: Button) {
+        if (fromUsername.isEmpty()) return
+
+        val database = FirebaseDatabase.getInstance()
+        val requestsRef = database.getReference("FollowRequests")
+
+        // Remove the request from Firebase
+        requestsRef.child(toUsername).child(fromUsername).removeValue()
+            .addOnSuccessListener {
+                // Update button state
+                followButton.text = "Follow"
+                Toast.makeText(this, "Follow request cancelled", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to cancel request: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // Function to unfollow a user
+    private fun unfollowUser(fromUsername: String, toUsername: String, followButton: Button) {
+        if (fromUsername.isEmpty()) return
+
+        val database = FirebaseDatabase.getInstance()
+        val followersRef = database.getReference("Followers")
+        val followingRef = database.getReference("Following")
+
+        // Remove from followers list
+        followersRef.child(toUsername).child(fromUsername).removeValue()
+
+        // Remove from following list
+        followingRef.child(fromUsername).child(toUsername).removeValue()
+            .addOnSuccessListener {
+                // Update button state
+                followButton.text = "Follow"
+                Toast.makeText(this, "Unfollowed $toUsername", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to unfollow: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+    // Function to view another user's profile
+    private fun viewUserProfile(username: String) {
+        // For now, just show a toast
+        Toast.makeText(this, "Viewing profile of $username", Toast.LENGTH_SHORT).show()
+
+        // TODO: Implement a screen to view another user's profile
+        // This would be similar to showScreen10 but for a different user
+    }
+    // Function to manage recent searches
+    private fun addToRecentSearches(query: String) {
+        // Get existing recent searches
+        val recentSearches = getRecentSearches().toMutableList()
+
+        // Remove the query if it already exists (to avoid duplicates)
+        recentSearches.remove(query)
+
+        // Add the new query at the beginning
+        recentSearches.add(0, query)
+
+        // Keep only the most recent 5 searches
+        val trimmedList = recentSearches.take(5)
+
+        // Save the updated list
+        val editor = sharedPreferences.edit()
+        editor.putString("recent_searches", trimmedList.joinToString(","))
+        editor.apply()
+    }
+
+    // Function to get recent searches from SharedPreferences
+    private fun getRecentSearches(): List<String> {
+        val recentSearchesString = sharedPreferences.getString("recent_searches", "")
+        return if (recentSearchesString.isNullOrEmpty()) {
+            emptyList()
+        } else {
+            recentSearchesString.split(",")
+        }
+    }
+
+    // Function to load and display recent searches
+    private fun loadRecentSearches(container: LinearLayout) {
+        // Clear existing views
+        container.removeAllViews()
+
+        // Get recent searches
+        val recentSearches = getRecentSearches()
+
+        // If there are no recent searches, show a message
+        if (recentSearches.isEmpty()) {
+            val noSearchesText = TextView(this).apply {
+                text = "No recent searches"
+                textSize = 16f
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                setTextColor(android.graphics.Color.GRAY)
+            }
+            container.addView(noSearchesText)
+            return
+        }
+
+        // Add each recent search to the container
+        for (search in recentSearches) {
+            // Create a horizontal layout for each item
+            val itemLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+
+            // Create text view for the search query
+            val searchTextView = TextView(this).apply {
+                text = search
+                textSize = 16f
+                setTextColor(android.graphics.Color.BLACK)
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1.0f
+                )
+            }
+
+            // Create delete button
+            val deleteButton = ImageView(this).apply {
+                setImageResource(R.drawable.cross_icon)
+                layoutParams = LinearLayout.LayoutParams(
+                    25.dpToPx(),
+                    25.dpToPx()
+                )
+                setPadding(0, 0, 10.dpToPx(), 0)
+            }
+
+            // Set click listener for the delete button
+            deleteButton.setOnClickListener {
+                removeRecentSearch(search)
+                loadRecentSearches(container) // Reload the list
+            }
+
+            // Set click listener for the search text to perform the search again
+            searchTextView.setOnClickListener {
+                // Get the search EditText and set its text
+                val searchEditText = findViewById<EditText>(R.id.searchEditText)
+                searchEditText.setText(search)
+
+                // Trigger the search
+                findViewById<ImageView>(R.id.searchButton).performClick()
+            }
+
+            // Add views to the layout
+            itemLayout.addView(searchTextView)
+            itemLayout.addView(deleteButton)
+
+            // Add the item to the container
+            container.addView(itemLayout)
+        }
+    }
+
+    // Function to remove a recent search
+    private fun removeRecentSearch(query: String) {
+        // Get existing recent searches
+        val recentSearches = getRecentSearches().toMutableList()
+
+        // Remove the query
+        recentSearches.remove(query)
+
+        // Save the updated list
+        val editor = sharedPreferences.edit()
+        editor.putString("recent_searches", recentSearches.joinToString(","))
+        editor.apply()
+
+        Toast.makeText(this, "Removed from recent searches", Toast.LENGTH_SHORT).show()
     }
 
     // If you want to support multiple images (since your UI shows horizontally scrollable images)
@@ -1161,6 +2588,26 @@ class MainActivity : AppCompatActivity() {
 
         if (resultCode == Activity.RESULT_OK) {
             when (requestCode) {
+                PROFILE_IMAGE_REQUEST -> {
+                    // Handle profile image selection
+                    data?.data?.let { uri ->
+                        val profileImageView = findViewById<ImageView>(R.id.profileImage)
+
+                        // Load the selected image
+                        Glide.with(this)
+                            .load(uri)
+                            .centerCrop()
+                            .into(profileImageView)
+
+                        // Reset the alpha to make the image fully visible
+                        profileImageView.alpha = 1.0f
+
+                        // Here you would typically upload the image to Firebase Storage
+                        // and update the user's profile with the image URL
+                        // For simplicity, we're just showing it locally for now
+                        Toast.makeText(this, "Profile picture updated", Toast.LENGTH_SHORT).show()
+                    }
+                }
                 PICK_IMAGE_REQUEST -> {
                     // Check if multiple images were selected
                     if (data?.clipData != null) {

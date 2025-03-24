@@ -66,6 +66,7 @@
         </FrameLayout>
 
         <TextView
+            android:id="@+id/profileNameTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Olivia Daniel"
@@ -94,6 +95,7 @@
             android:layout_marginBottom="6dp"/>
 
         <EditText
+            android:id="@+id/nameEditText"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:background="@drawable/edit_border"
@@ -114,6 +116,7 @@
             android:layout_marginTop="12dp"/>
 
         <EditText
+            android:id="@+id/usernameEditText"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:background="@drawable/edit_border"
@@ -134,6 +137,7 @@
             android:layout_marginTop="12dp"/>
 
         <EditText
+            android:id="@+id/phoneEditText"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:background="@drawable/edit_border"

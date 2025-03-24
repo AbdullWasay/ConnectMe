@@ -68,6 +68,7 @@
 
         <!-- Bio -->
         <TextView
+            android:id="@+id/userBio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="two bananas for a pound, three bananas for a euro"

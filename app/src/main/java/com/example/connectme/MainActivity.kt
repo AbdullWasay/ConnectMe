@@ -26,6 +26,7 @@ import android.widget.ImageView
 import android.widget.Toast
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.widget.Button
 import android.widget.ImageButton
 
@@ -37,6 +38,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import android.widget.RelativeLayout
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -57,6 +59,8 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_PHONE = "phone"
         private const val KEY_BIO = "bio"  // Add this for bio
         private const val PROFILE_IMAGE_REQUEST = 3  // Add this for profile image selection
+        private const val CHAT_PARTNER_USERNAME = "chat_partner_username"
+        private const val CHAT_PARTNER_NAME = "chat_partner_name"
     }
 
 
@@ -102,6 +106,64 @@ class MainActivity : AppCompatActivity() {
         editor.clear()
         editor.apply()
     }
+    // Update the startChatWithUser function to open the chat screen
+    private fun startChatWithUser(username: String) {
+        // Get user info to display in chat
+        getUserInfo(username) { name, profilePicUrl ->
+            // Create or get chat ID
+            val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+            createOrGetChatId(currentUsername, username) { chatId ->
+                // Store chat partner info temporarily
+                val editor = sharedPreferences.edit()
+                editor.putString(CHAT_PARTNER_USERNAME, username)
+                editor.putString(CHAT_PARTNER_NAME, name)
+                editor.apply()
+
+                // Open chat screen
+                showScreen6(chatId, username, name, profilePicUrl)
+            }
+        }
+    }
+
+    // Function to create or get a chat ID between two users
+    private fun createOrGetChatId(user1: String, user2: String, callback: (String) -> Unit) {
+        // Sort usernames to ensure consistent chat ID regardless of who initiates
+        val sortedUsers = listOf(user1, user2).sorted()
+        val chatId = "${sortedUsers[0]}_${sortedUsers[1]}"
+
+        // Check if chat exists in Firebase
+        val database = FirebaseDatabase.getInstance()
+        val chatsRef = database.getReference("Chats")
+
+        chatsRef.child(chatId).get().addOnSuccessListener { snapshot ->
+            if (!snapshot.exists()) {
+                // Create new chat entry
+                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                val chatData = mapOf(
+                    "participants" to sortedUsers,
+                    "created_at" to timestamp,
+                    "last_message" to "",
+                    "last_message_time" to timestamp
+                )
+
+                chatsRef.child(chatId).setValue(chatData)
+                    .addOnSuccessListener {
+                        callback(chatId)
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("CreateChat", "Error creating chat: ${e.message}")
+                        callback(chatId) // Still proceed with the chat ID
+                    }
+            } else {
+                // Chat already exists
+                callback(chatId)
+            }
+        }.addOnFailureListener { e ->
+            Log.e("CreateChat", "Error checking chat: ${e.message}")
+            callback(chatId) // Still proceed with the chat ID
+        }
+    }
+
 
     private fun showScreen2() {
         setContentView(R.layout.screen2)
@@ -254,25 +316,283 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScreen5() {
-        setContentView(R.layout.screen5) // Screen 5 layout
+        setContentView(R.layout.screen5)
 
-        //Back button
+        // Back button
         val backButton = findViewById<ImageView>(R.id.BackButtonm)
         backButton.setOnClickListener {
             showScreen4()
         }
 
-        val requestspage = findViewById<LinearLayout>(R.id.requests_container)
-        requestspage.setOnClickListener {
+        // Requests tab
+        val requestsTab = findViewById<LinearLayout>(R.id.requests_container)
+        requestsTab.setOnClickListener {
             showScreen19()
         }
 
-        //Open Chat
-        val chat = findViewById<LinearLayout>(R.id.chat2)
-        chat.setOnClickListener {
-            showScreen6()
+        // Get current username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername.isEmpty()) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Get chat container
+        val chatContainer = findViewById<LinearLayout>(R.id.chatContainer)
+
+        // Load chats
+        loadChats(currentUsername, chatContainer)
+
+        // Set up search functionality
+        val searchEditText = findViewById<EditText>(R.id.searchEditText)
+        val searchButton = findViewById<ImageView>(R.id.searchButton)
+
+        searchButton?.setOnClickListener {
+            val query = searchEditText?.text.toString().trim()
+            if (query.isNotEmpty()) {
+                // Filter chats
+                filterChats(query, currentUsername, chatContainer)
+            } else {
+                // Reload all chats
+                loadChats(currentUsername, chatContainer)
+            }
         }
     }
+
+    // Function to load chats from Firebase
+    private fun loadChats(username: String, container: LinearLayout) {
+        // Clear existing views
+        container.removeAllViews()
+
+        // Show loading indicator
+        val loadingText = TextView(this).apply {
+            text = "Loading chats..."
+            textSize = 16f
+            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+        }
+        container.addView(loadingText)
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val chatsRef = database.getReference("Chats")
+
+        // Query for chats where this user is a participant
+        chatsRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                // Clear the container
+                container.removeAllViews()
+
+                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                    // No chats found
+                    val noChatsText = TextView(this@MainActivity).apply {
+                        text = "No chats yet. Start a conversation with someone!"
+                        textSize = 16f
+                        setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                        setTextColor(android.graphics.Color.GRAY)
+                    }
+                    container.addView(noChatsText)
+                    return
+                }
+
+                // Process each chat
+                val chatsList = ArrayList<Map<String, Any>>()
+
+                for (chatSnapshot in snapshot.children) {
+                    val chatId = chatSnapshot.key ?: continue
+                    val chatData = chatSnapshot.value as? Map<*, *> ?: continue
+
+                    // Get participants
+                    val participants = chatData["participants"] as? List<*> ?: continue
+                    if (!participants.contains(username)) continue
+
+                    // Find the other participant (not the current user)
+                    val otherUser = participants.find { it != username } as? String ?: continue
+
+                    // Get last message and time
+                    val lastMessage = chatData["last_message"] as? String ?: ""
+                    val lastMessageTime = chatData["last_message_time"] as? String ?: ""
+
+                    // Create a map with chat info
+                    val chatInfo = mapOf(
+                        "chatId" to chatId,
+                        "otherUser" to otherUser,
+                        "lastMessage" to lastMessage,
+                        "lastMessageTime" to lastMessageTime
+                    )
+
+                    chatsList.add(chatInfo)
+                }
+
+                // Sort chats by last message time (most recent first)
+                chatsList.sortByDescending { it["lastMessageTime"] as String }
+
+                // Display each chat
+                for (chatInfo in chatsList) {
+                    val otherUsername = chatInfo["otherUser"] as String
+                    val chatId = chatInfo["chatId"] as String
+                    val lastMessage = chatInfo["lastMessage"] as String
+
+                    // Get user info for the other participant
+                    getUserInfo(otherUsername) { name, profilePicUrl ->
+                        // Create chat item view
+                        val chatView = createChatItemView(chatId, otherUsername, name, profilePicUrl, lastMessage)
+                        container.addView(chatView)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Chats", "Error loading chats: ${error.message}")
+
+                // Show error message
+                container.removeAllViews()
+                val errorText = TextView(this@MainActivity).apply {
+                    text = "Error loading chats: ${error.message}"
+                    textSize = 16f
+                    setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                    setTextColor(android.graphics.Color.RED)
+                }
+                container.addView(errorText)
+            }
+        })
+    }
+
+    // Update the createChatItemView function to include the last message:
+
+    // Function to create a chat item view
+    private fun createChatItemView(chatId: String, username: String, name: String, profilePicUrl: String, lastMessage: String = ""): View {
+        // Create a horizontal layout for the chat item
+        val itemLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+
+        // Create profile image
+        val profileImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+        }
+
+        // Load profile image
+        if (profilePicUrl.isNotEmpty()) {
+            Glide.with(this)
+                .load(profilePicUrl)
+                .centerCrop()
+                .into(profileImageView)
+        } else {
+            // Use a default profile image
+            profileImageView.setImageResource(R.drawable.profilepic1)
+        }
+
+        // Create a vertical layout for name and last message
+        val textContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1.0f
+            )
+            setPadding(12.dpToPx(), 0, 0, 0)
+        }
+
+        // Create text view for the name
+        val nameTextView = TextView(this).apply {
+            text = name
+            textSize = 16f
+            setTextColor(android.graphics.Color.BLACK)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+
+        // Create text view for the last message
+        val lastMessageTextView = TextView(this).apply {
+            text = if (lastMessage.isNotEmpty()) lastMessage else "No messages yet"
+            textSize = 14f
+            setTextColor(android.graphics.Color.GRAY)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+
+        // Add text views to the container
+        textContainer.addView(nameTextView)
+        textContainer.addView(lastMessageTextView)
+
+        // Create camera icon
+        val cameraIcon = ImageView(this).apply {
+            setImageResource(R.drawable.camera_icon)
+            layoutParams = LinearLayout.LayoutParams(
+                32.dpToPx(),
+                32.dpToPx()
+            )
+        }
+
+        // Add views to the main layout
+        itemLayout.addView(profileImageView)
+        itemLayout.addView(textContainer)
+        itemLayout.addView(cameraIcon)
+
+        // Set click listener to open chat
+        itemLayout.setOnClickListener {
+            // Store chat partner info temporarily
+            val editor = sharedPreferences.edit()
+            editor.putString(CHAT_PARTNER_USERNAME, username)
+            editor.putString(CHAT_PARTNER_NAME, name)
+            editor.apply()
+
+            // Open chat screen
+            showScreen6(chatId, username, name, profilePicUrl)
+        }
+
+        return itemLayout
+    }
+
+    // Function to filter chats by search query
+    private fun filterChats(query: String, username: String, container: LinearLayout) {
+        // This is a simple client-side filtering
+        // For a real app, you might want to do this filtering on the server
+
+        // Get all chat items
+        val chatItems = ArrayList<View>()
+        for (i in 0 until container.childCount) {
+            chatItems.add(container.getChildAt(i))
+        }
+
+        // Clear container
+        container.removeAllViews()
+
+        // Filter and add matching items
+        var matchFound = false
+        for (item in chatItems) {
+            if (item is LinearLayout) {
+                // Find the name TextView (second child)
+                val nameTextView = item.getChildAt(1) as? TextView
+                val name = nameTextView?.text?.toString() ?: ""
+
+                if (name.contains(query, ignoreCase = true)) {
+                    container.addView(item)
+                    matchFound = true
+                }
+            }
+        }
+
+        // Show no results message if needed
+        if (!matchFound) {
+            val noResultsText = TextView(this).apply {
+                text = "No matching chats found"
+                textSize = 16f
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                setTextColor(android.graphics.Color.GRAY)
+            }
+            container.addView(noResultsText)
+        }
+    }
+
     private fun showScreen19() {
         setContentView(R.layout.screen19request)
 
@@ -613,14 +933,32 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun showScreen6() {
-        setContentView(R.layout.screen6) // Set layout for Screen 6
+    private fun showScreen6(chatId: String, username: String, name: String, profilePicUrl: String) {
+        setContentView(R.layout.screen6)
 
+        // Set user name in the header
+        val userNameTextView = findViewById<TextView>(R.id.userName)
+        userNameTextView.text = name
+
+        // Set profile image
+        val profileImageView = findViewById<ImageView>(R.id.profileImage)
+        if (profilePicUrl.isNotEmpty()) {
+            Glide.with(this)
+                .load(profilePicUrl)
+                .centerCrop()
+                .into(profileImageView)
+        } else {
+            // Use a default profile image
+            profileImageView.setImageResource(R.drawable.profilepic3)
+        }
+
+        // Set up back button
         val backButton = findViewById<ImageView>(R.id.BackButton)
         backButton.setOnClickListener {
             showScreen5()
         }
 
+        // Set up call buttons
         val callButton = findViewById<ImageView>(R.id.callbutton)
         callButton.setOnClickListener {
             showScreen8()
@@ -631,8 +969,32 @@ class MainActivity : AppCompatActivity() {
             showScreen9()
         }
 
-        val rootView = findViewById<ScrollView>(R.id.messagearea)
+        // Set up view profile button
+        val viewProfileButton = findViewById<Button>(R.id.viewProfileButton)
+        viewProfileButton.setOnClickListener {
+            viewUserProfile(username)
+        }
 
+        // Get message container
+        val messageContainer = findViewById<LinearLayout>(R.id.messageContainer)
+
+        // Load messages
+        loadMessages(chatId, messageContainer)
+
+        // Set up send message functionality
+        val messageInput = findViewById<EditText>(R.id.messageInput)
+        val sendButton = findViewById<ImageView>(R.id.sendButton)
+
+        sendButton.setOnClickListener {
+            val messageText = messageInput.text.toString().trim()
+            if (messageText.isNotEmpty()) {
+                sendMessage(chatId, username, messageText, messageContainer)
+                messageInput.text.clear()
+            }
+        }
+
+        // Set up swipe gesture for screen 7
+        val rootView = findViewById<ScrollView>(R.id.messagearea)
         rootView.setOnTouchListener(object : View.OnTouchListener {
             private var startY: Float = 0f
 
@@ -656,6 +1018,318 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    // Function to load messages from Firebase
+    private fun loadMessages(chatId: String, container: LinearLayout) {
+        // Clear existing views
+        container.removeAllViews()
+
+        // Get current username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val messagesRef = database.getReference("Messages").child(chatId)
+
+        // Query for messages
+        messagesRef.orderByChild("timestamp")
+            .addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    // Clear the container
+                    container.removeAllViews()
+
+                    if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                        // No messages found
+                        val noMessagesText = TextView(this@MainActivity).apply {
+                            text = "No messages yet. Start the conversation!"
+                            textSize = 16f
+                            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                            setTextColor(android.graphics.Color.GRAY)
+                            gravity = android.view.Gravity.CENTER
+                        }
+                        container.addView(noMessagesText)
+                        return
+                    }
+
+                    // Process each message
+                    val messagesList = ArrayList<Map<String, Any>>()
+
+                    for (messageSnapshot in snapshot.children) {
+                        val messageData = messageSnapshot.value as? Map<*, *> ?: continue
+
+                        // Get message details
+                        val sender = messageData["sender"] as? String ?: ""
+                        val text = messageData["text"] as? String ?: ""
+                        val timestamp = messageData["timestamp"] as? String ?: ""
+                        val time = formatMessageTime(timestamp)
+
+                        // Create a map with message info
+                        val messageInfo = mapOf(
+                            "sender" to sender,
+                            "text" to text,
+                            "timestamp" to timestamp,
+                            "time" to time
+                        )
+
+                        messagesList.add(messageInfo)
+                    }
+
+                    // Sort messages by timestamp
+                    messagesList.sortBy { it["timestamp"] as String }
+
+                    // Display each message
+                    for (messageInfo in messagesList) {
+                        val sender = messageInfo["sender"] as String
+                        val text = messageInfo["text"] as String
+                        val time = messageInfo["time"] as String
+
+                        // Create message view based on sender
+                        val messageView = if (sender == currentUsername) {
+                            createOutgoingMessageView(text, time)
+                        } else {
+                            createIncomingMessageView(text, time)
+                        }
+
+                        container.addView(messageView)
+                    }
+
+                    // Scroll to bottom
+                    val scrollView = findViewById<ScrollView>(R.id.messagearea)
+                    scrollView.post {
+                        scrollView.fullScroll(ScrollView.FOCUS_DOWN)
+                    }
+
+                    // Update last seen message in Chats
+                    val lastMessage = messagesList.lastOrNull()
+                    if (lastMessage != null) {
+                        updateLastMessage(chatId, lastMessage["text"] as String, lastMessage["timestamp"] as String)
+                    }
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    Log.e("Messages", "Error loading messages: ${error.message}")
+
+                    // Show error message
+                    container.removeAllViews()
+                    val errorText = TextView(this@MainActivity).apply {
+                        text = "Error loading messages: ${error.message}"
+                        textSize = 16f
+                        setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                        setTextColor(android.graphics.Color.RED)
+                    }
+                    container.addView(errorText)
+                }
+            })
+    }
+
+    // Function to send a message
+    private fun sendMessage(chatId: String, recipientUsername: String, messageText: String, container: LinearLayout) {
+        // Get current username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername.isEmpty()) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Get current timestamp
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+        // Create message data
+        val messageData = mapOf(
+            "sender" to currentUsername,
+            "recipient" to recipientUsername,
+            "text" to messageText,
+            "timestamp" to timestamp,
+            "read" to false
+        )
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val messagesRef = database.getReference("Messages").child(chatId)
+
+        // Generate a unique message ID
+        val messageId = messagesRef.push().key ?: UUID.randomUUID().toString()
+
+        // Save message to Firebase
+        messagesRef.child(messageId).setValue(messageData)
+            .addOnSuccessListener {
+                // Message sent successfully
+                // The ValueEventListener will update the UI
+
+                // Update last message in Chats
+                updateLastMessage(chatId, messageText, timestamp)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to send message: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // Function to update last message in Chats
+    private fun updateLastMessage(chatId: String, lastMessage: String, timestamp: String) {
+        val database = FirebaseDatabase.getInstance()
+        val chatsRef = database.getReference("Chats")
+
+        val updates = mapOf(
+            "last_message" to lastMessage,
+            "last_message_time" to timestamp
+        )
+
+        chatsRef.child(chatId).updateChildren(updates)
+            .addOnFailureListener { e ->
+                Log.e("UpdateChat", "Error updating last message: ${e.message}")
+            }
+    }
+
+    // Function to create an outgoing message view (sent by current user)
+    private fun createOutgoingMessageView(message: String, time: String): View {
+        // Create a container for the message
+        val messageLayout = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
+            }
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END
+        }
+
+        // Create message bubble
+        val messageBubble = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
+            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+        }
+
+        // Create message text
+        val messageText = TextView(this).apply {
+            text = message  // Fixed issue by renaming the parameter
+            textSize = 14f
+            setTextColor(android.graphics.Color.BLACK)
+        }
+
+        // Create time text
+        val timeText = TextView(this).apply {
+            text = time
+            textSize = 12f
+            setTextColor(android.graphics.Color.GRAY)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.END
+                topMargin = 1.dpToPx()
+            }
+        }
+
+        // Add message text to bubble
+        messageBubble.addView(messageText)
+
+        // Add views to layout
+        messageLayout.addView(messageBubble)
+        messageLayout.addView(timeText)
+
+        return messageLayout
+    }
+
+    // Function to create an incoming message view (received from other user)
+    private fun createIncomingMessageView(message: String, time: String): View {
+        // Create a horizontal layout to hold the profile image and message bubble
+        val messageLayout = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
+            }
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+        }
+
+        // Create profile image
+        val profileImage = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(40.dpToPx(), 40.dpToPx()).apply {
+                marginEnd = 8.dpToPx()
+            }
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            setImageResource(R.drawable.profilepic3)
+        }
+
+        // Create a vertical layout for message bubble and time
+        val messageContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Create message bubble
+        val messageBubble = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
+            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+        }
+
+        // Create message text
+        val messageText = TextView(this).apply {
+            text = message  // Fixed issue by renaming the parameter
+            textSize = 14f
+            setTextColor(android.graphics.Color.BLACK)
+        }
+
+        // Create time text
+        val timeText = TextView(this).apply {
+            text = time
+            textSize = 12f
+            setTextColor(android.graphics.Color.GRAY)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.START
+                topMargin = 2.dpToPx()
+            }
+        }
+
+        // Add message text to bubble
+        messageBubble.addView(messageText)
+
+        // Add message bubble and time text to container
+        messageContainer.addView(messageBubble)
+        messageContainer.addView(timeText)
+
+        // Add profile image and message container to the main layout
+        messageLayout.addView(profileImage)
+        messageLayout.addView(messageContainer)
+
+        return messageLayout
+    }
+
+    // Function to format message timestamp to a readable time
+    private fun formatMessageTime(timestamp: String): String {
+        try {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val date = dateFormat.parse(timestamp) ?: return ""
+
+            val now = Date()
+            val diff = now.time - date.time
+
+            // If message is from today, show only time
+            return if (diff < 24 * 60 * 60 * 1000) {
+                SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+            } else {
+                // Otherwise show date and time
+                SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(date)
+            }
+        } catch (e: Exception) {
+            Log.e("FormatTime", "Error formatting time: ${e.message}")
+            return ""
+        }
+    }
     private fun showScreen7() {
         setContentView(R.layout.screen7)
 
@@ -679,7 +1353,7 @@ class MainActivity : AppCompatActivity() {
                         val deltaY = startY - endY
 
                         if (deltaY > 100) {
-                            showScreen6()
+                            //showScreen6()
                             return true
                         }
                     }
@@ -694,7 +1368,7 @@ class MainActivity : AppCompatActivity() {
 
         val EndCall = findViewById<ImageView>(R.id.btnEndCall)
         EndCall.setOnClickListener {
-            showScreen6()
+            //showScreen6()
         }
     }
 
@@ -703,7 +1377,7 @@ class MainActivity : AppCompatActivity() {
 
         val EndCall = findViewById<ImageView>(R.id.btnEndCall)
         EndCall.setOnClickListener {
-            showScreen6()
+            // showScreen6()
         }
     }
 
@@ -902,9 +1576,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Get references to UI elements
-        val followersCountText = findViewById<TextView>(R.id.tabfollowing)
-        val searchEditText = findViewById<EditText>(R.id.searchEditText)
-        val searchButton = findViewById<ImageView>(R.id.searchButton)
+        val followersCountText = findViewById<TextView>(R.id.tabFollowers)
+        val followingCountText = findViewById<TextView>(R.id.tabFollowing)
         val followersContainer = findViewById<LinearLayout>(R.id.followersContainer)
 
         // Get current username
@@ -917,16 +1590,24 @@ class MainActivity : AppCompatActivity() {
         // Load followers
         loadFollowers(currentUsername, followersContainer, followersCountText)
 
-        // Set up search functionality
-        searchButton?.setOnClickListener {
-            val query = searchEditText?.text.toString().trim()
-            if (query.isNotEmpty()) {
-                filterFollowers(query, followersContainer)
-            } else {
-                // Reload all followers
-                loadFollowers(currentUsername, followersContainer, followersCountText)
+        // Load following count (this was missing)
+        loadFollowingCount(currentUsername, followingCountText)
+    }
+
+    // Function to load only the following count
+    private fun loadFollowingCount(username: String, countTextView: TextView) {
+        val database = FirebaseDatabase.getInstance()
+        val followingRef = database.getReference("Following").child(username)
+
+        followingRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                countTextView.text = "${snapshot.childrenCount} Following"
             }
-        }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                countTextView.text = "0 Following"
+            }
+        })
     }
 
     // Update the showScreen12 method to load and display following
@@ -947,8 +1628,7 @@ class MainActivity : AppCompatActivity() {
 
         // Get references to UI elements
         val followingCountText = findViewById<TextView>(R.id.tab_requests)
-        val searchEditText = findViewById<EditText>(R.id.searchEditText)
-        val searchButton = findViewById<ImageView>(R.id.searchButton)
+        val followersCountText = findViewById<TextView>(R.id.tab_dms) // Missing followers count
         val followingContainer = findViewById<LinearLayout>(R.id.followingContainer)
 
         // Get current username
@@ -961,16 +1641,24 @@ class MainActivity : AppCompatActivity() {
         // Load following
         loadFollowing(currentUsername, followingContainer, followingCountText)
 
-        // Set up search functionality
-        searchButton?.setOnClickListener {
-            val query = searchEditText?.text.toString().trim()
-            if (query.isNotEmpty()) {
-                filterFollowing(query, followingContainer)
-            } else {
-                // Reload all following
-                loadFollowing(currentUsername, followingContainer, followingCountText)
+        // Load followers count (this was missing)
+        loadFollowersCount(currentUsername, followersCountText)
+    }
+
+    // Function to load only the followers count
+    private fun loadFollowersCount(username: String, countTextView: TextView) {
+        val database = FirebaseDatabase.getInstance()
+        val followersRef = database.getReference("Followers").child(username)
+
+        followersRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                countTextView.text = "${snapshot.childrenCount} Followers"
             }
-        }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                countTextView.text = "0 Followers"
+            }
+        })
     }
 
     // Function to load followers from Firebase
@@ -1338,14 +2026,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function to start a chat with a user
-    private fun startChatWithUser(username: String) {
-        // For now, just show a toast
-        Toast.makeText(this, "Starting chat with $username", Toast.LENGTH_SHORT).show()
-
-        // TODO: Implement actual chat functionality
-        // This would typically involve navigating to the chat screen
-        // and setting up a chat session with the selected user
-    }
 
     private fun showScreen13() {
         setContentView(R.layout.screen13)
@@ -2666,5 +3346,5 @@ class MainActivity : AppCompatActivity() {
 
 
 
-
 }
+

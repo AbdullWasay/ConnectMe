@@ -60,7 +60,7 @@
                 android:gravity="center">
 
                 <TextView
-                    android:id="@+id/tabfollowing"
+                    android:id="@+id/tabFollowers"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="410 Followers"
@@ -89,7 +89,7 @@
             android:gravity="center">
 
             <TextView
-                android:id="@+id/tab_requests"
+                android:id="@+id/tabFollowing"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="387 Following"

@@ -2774,17 +2774,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private fun showScreen16() {
-        setContentView(R.layout.screen16)
+//        setContentView(R.layout.screen16)
+//
+//        val ClosePost = findViewById<ImageView>(R.id.btnClose)
+//        ClosePost.setOnClickListener {
+//            showScreen4()
+//        }
+//
+//        val NextPost = findViewById<TextView>(R.id.btnNext)
+//        NextPost.setOnClickListener {
+//            showScreen17()
+//        }
+        val username = sharedPreferences.getString(KEY_USERNAME, null) ?: return
 
-        val ClosePost = findViewById<ImageView>(R.id.btnClose)
-        ClosePost.setOnClickListener {
-            showScreen4()
-        }
-
-        val NextPost = findViewById<TextView>(R.id.btnNext)
-        NextPost.setOnClickListener {
-            showScreen17()
-        }
+        val intent = Intent(this, Screen16Activity::class.java)
+        intent.putExtra("USERNAME", username)
+        startActivity(intent)
     }
 
 

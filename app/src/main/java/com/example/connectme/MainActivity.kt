@@ -74,17 +74,17 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main) // Screen 1 layout
         showScreen2()
-//        if (isLoggedIn()) {
-//            // Skip to home screen
-//            Handler(Looper.getMainLooper()).postDelayed({
-//                showScreen4()
-//            }, 1000)
-//        } else {
-//            // Show login screen after splash
-//            Handler(Looper.getMainLooper()).postDelayed({
-//                showScreen2()
-//            }, 3000)
-//        }
+        if (isLoggedIn()) {
+            // Skip to home screen
+            Handler(Looper.getMainLooper()).postDelayed({
+                showScreen4()
+            }, 1000)
+        } else {
+            // Show login screen after splash
+            Handler(Looper.getMainLooper()).postDelayed({
+                showScreen2()
+            }, 3000)
+        }
     }
 
     private fun isLoggedIn(): Boolean {
@@ -3199,6 +3199,11 @@ class MainActivity : AppCompatActivity() {
         NextPost.setOnClickListener {
             showScreen17()
         }
+        val username = sharedPreferences.getString(KEY_USERNAME, null) ?: return
+
+        val intent = Intent(this, Screen16Activity::class.java)
+        intent.putExtra("USERNAME", username)
+        startActivity(intent)
     }
 
 

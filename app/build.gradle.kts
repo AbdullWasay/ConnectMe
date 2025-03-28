@@ -41,6 +41,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation("com.github.bumptech.glide:glide:4.15.1")
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.lifecycle)
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
     implementation(libs.material)
     implementation(libs.androidx.activity)
@@ -53,4 +55,10 @@ dependencies {
     implementation ("com.github.bumptech.glide:glide:4.15.1")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation ("androidx.camera:camera-core:1.3.0")
+    implementation ("androidx.camera:camera-lifecycle:1.3.0")
+    implementation ("androidx.camera:camera-view:1.3.0")
+    implementation ("com.google.guava:guava:31.0.1-android")
+    implementation("androidx.camera:camera-camera2:1.3.0")
+
 }

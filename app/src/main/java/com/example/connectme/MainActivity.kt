@@ -2,6 +2,7 @@ package com.example.connectme
 import android.content.Intent
 import android.os.Bundle
 import android.Manifest
+import android.animation.ObjectAnimator
 import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
@@ -45,6 +46,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.bumptech.glide.Glide
 import android.view.GestureDetector
 import android.view.ViewGroup
+import android.widget.ProgressBar
 
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
@@ -73,18 +75,21 @@ class MainActivity : AppCompatActivity() {
         sharedPreferences = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
         setContentView(R.layout.activity_main) // Screen 1 layout
+
+        // Check for expired stories
+        cleanupExpiredStories()
         showScreen2()
-        if (isLoggedIn()) {
-            // Skip to home screen
-            Handler(Looper.getMainLooper()).postDelayed({
-                showScreen4()
-            }, 1000)
-        } else {
-            // Show login screen after splash
-            Handler(Looper.getMainLooper()).postDelayed({
-                showScreen2()
-            }, 3000)
-        }
+//        if (isLoggedIn()) {
+//            // Skip to home screen
+//            Handler(Looper.getMainLooper()).postDelayed({
+//                showScreen4()
+//            }, 1000)
+//        } else {
+//            // Show login screen after splash
+//            Handler(Looper.getMainLooper()).postDelayed({
+//                showScreen2()
+//            }, 3000)
+//        }
     }
 
     private fun isLoggedIn(): Boolean {
@@ -288,7 +293,14 @@ class MainActivity : AppCompatActivity() {
 
         val addStory = findViewById<ImageButton>(R.id.AddStory)
         addStory.setOnClickListener {
-            showScreen16()
+            val username = sharedPreferences.getString(KEY_USERNAME, null)
+            if (username != null) {
+                val intent = Intent(this, Screen16Activity::class.java)
+                intent.putExtra("USERNAME", username)
+                startActivity(intent)
+            } else {
+                Toast.makeText(this, "You need to be logged in to add a story", Toast.LENGTH_SHORT).show()
+            }
         }
 
         val gotoHome = findViewById<ImageButton>(R.id.HomePage)
@@ -319,9 +331,223 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Load stories from followed users
+        loadFollowingStories(currentUsername)
+
         // Load posts from followed users
         loadFollowingPosts(currentUsername)
     }
+
+    private fun cleanupExpiredStories() {
+        val database = FirebaseDatabase.getInstance()
+        val storiesRef = database.getReference("stories")
+
+        storiesRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (!snapshot.exists()) {
+                    return
+                }
+
+                val currentTime = System.currentTimeMillis()
+                val oneDayInMillis = 24 * 60 * 60 * 1000
+
+                for (userSnapshot in snapshot.children) {
+                    val username = userSnapshot.key ?: continue
+                    val storyTimestamp = userSnapshot.child("timestamp").value as? Long ?: 0
+
+                    // Check if story is older than 24 hours
+                    val storyAge = currentTime - storyTimestamp
+                    if (storyAge > oneDayInMillis) {
+                        // Delete expired story
+                        deleteExpiredStory(username)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("CleanupStories", "Error checking stories: ${error.message}")
+            }
+        })
+    }
+
+    // Function to delete expired stories
+    private fun deleteExpiredStory(username: String) {
+        val database = FirebaseDatabase.getInstance()
+        val storyRef = database.getReference("stories").child(username)
+
+        storyRef.removeValue()
+            .addOnSuccessListener {
+                Log.d("DeleteStory", "Expired story deleted for user: $username")
+            }
+            .addOnFailureListener { e ->
+                Log.e("DeleteStory", "Error deleting expired story: ${e.message}")
+            }
+    }
+
+    // Function to load stories from followed users
+    private fun loadFollowingStories(currentUsername: String) {
+        // Get reference to the stories container
+        val storiesContainer = findViewById<HorizontalScrollView>(R.id.storiesSection)?.getChildAt(0) as? LinearLayout
+        if (storiesContainer == null) {
+            Log.e("Stories", "Stories container not found")
+            return
+        }
+
+        // Clear existing stories except the first one (which is the user's own story)
+        if (storiesContainer.childCount > 1) {
+            storiesContainer.removeViews(1, storiesContainer.childCount - 1)
+        }
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val followingRef = database.getReference("Following").child(currentUsername)
+
+        // Get list of users that the current user follows
+        followingRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                    // Not following anyone, no stories to show
+                    return
+                }
+
+                // Get list of followed usernames
+                val followedUsers = ArrayList<String>()
+                for (userSnapshot in snapshot.children) {
+                    val username = userSnapshot.key ?: continue
+                    followedUsers.add(username)
+                }
+
+                // Now fetch stories from these users
+                fetchStoriesFromUsers(followedUsers, storiesContainer)
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("LoadFollowingStories", "Error loading following: ${error.message}")
+            }
+        })
+    }
+
+    // Function to fetch stories from followed users
+    private fun fetchStoriesFromUsers(usernames: List<String>, container: LinearLayout) {
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val storiesRef = database.getReference("stories")
+
+        // For each username, check if they have a story
+        for (username in usernames) {
+            storiesRef.child(username).addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    if (!snapshot.exists()) {
+                        // No story for this user
+                        return
+                    }
+
+                    // Get story data
+                    val storyImage = snapshot.child("image").value as? String
+                    val storyTimestamp = snapshot.child("timestamp").value as? Long ?: 0
+
+                    // Check if story is less than 24 hours old
+                    val currentTime = System.currentTimeMillis()
+                    val storyAge = currentTime - storyTimestamp
+                    val oneDayInMillis = 24 * 60 * 60 * 1000
+
+                    if (storyAge > oneDayInMillis) {
+                        // Story is older than 24 hours, don't show it
+                        return
+                    }
+
+                    // Get user info for the story author
+                    getUserInfo(username) { name, profilePicUrl ->
+                        // Create story view
+                        val storyView = createStoryView(username, name, profilePicUrl, storyImage)
+                        container.addView(storyView)
+                    }
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    Log.e("FetchStories", "Error fetching story for $username: ${error.message}")
+                }
+            })
+        }
+    }
+
+    // Function to create a story view
+    private fun createStoryView(username: String, name: String, profilePicUrl: String, storyImage: String?): View {
+        // Create story image view
+        val storyImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(80.dpToPx(), 80.dpToPx()).apply {
+                marginEnd = 10.dpToPx()
+            }
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+        }
+
+        // Load profile image if available
+        if (profilePicUrl.isNotEmpty()) {
+            Glide.with(this)
+                .load(profilePicUrl)
+                .centerCrop()
+                .into(storyImageView)
+        } else {
+            // Use a default profile image
+            storyImageView.setImageResource(R.drawable.profilepic1)
+        }
+
+        // Set click listener to view story
+        storyImageView.setOnClickListener {
+            viewStory(username, name, storyImage)
+        }
+
+        return storyImageView
+    }
+
+    // Function to view a story
+    private fun viewStory(username: String, name: String, storyImage: String?) {
+        if (storyImage.isNullOrEmpty()) {
+            Toast.makeText(this, "Story not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Create a dialog to show the story
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(R.layout.screen20storyview)
+
+        // Get views from the dialog
+        val storyImageView = dialog.findViewById<ImageView>(R.id.storyImage)
+        val usernameTextView = dialog.findViewById<TextView>(R.id.storyUsername)
+        val progressBar = dialog.findViewById<ProgressBar>(R.id.storyProgress)
+
+        // Set username
+        usernameTextView.text = name
+
+        // Load story image
+        try {
+            val imageBytes = android.util.Base64.decode(storyImage, android.util.Base64.DEFAULT)
+            val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            storyImageView.setImageBitmap(decodedImage)
+        } catch (e: Exception) {
+            Log.e("ViewStory", "Error decoding image: ${e.message}")
+            storyImageView.setImageResource(R.drawable.profilepic1) // Default image
+        }
+
+        // Show the dialog
+        dialog.show()
+
+        // Animate progress bar
+        val progressAnimator = ObjectAnimator.ofInt(progressBar, "progress", 0, 100)
+        progressAnimator.duration = 5000 // 5 seconds
+        progressAnimator.start()
+
+        // Close the dialog after 5 seconds
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (dialog.isShowing) {
+                dialog.dismiss()
+            }
+        }, 5000) // 5 seconds
+    }
+
+
 
     // Function to load posts from users that the current user follows
     private fun loadFollowingPosts(currentUsername: String) {

@@ -16,6 +16,7 @@ import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -162,12 +163,20 @@ class Screen16Activity : AppCompatActivity() {
             return
         }
 
-        FirebaseDatabase.getInstance().reference.child("stories").child(username)
-            .setValue(Story(base64Image, System.currentTimeMillis()))
+        // Get reference to the story node
+        val storyRef = FirebaseDatabase.getInstance().reference.child("stories").child(username)
+
+        // Set TTL (Time To Live) to 24 hours (86400000 milliseconds)
+        storyRef.child(".info/ttl").setValue(86400000)
+
+        // Upload the story data
+        storyRef.setValue(Story(base64Image, System.currentTimeMillis()))
             .addOnSuccessListener {
                 Log.d("Firebase", "Story uploaded")
+                Toast.makeText(this, "Story will disappear after 24 hours", Toast.LENGTH_SHORT).show()
                 val intent = Intent(this, MainActivity::class.java)
                 startActivity(intent)
+                finish() // Close this activity
             }
             .addOnFailureListener { e ->
                 Log.e("Firebase", "Failed to upload story", e)
@@ -182,3 +191,5 @@ class Screen16Activity : AppCompatActivity() {
         private const val REQUEST_CODE_PERMISSIONS = 10
     }
 }
+
+

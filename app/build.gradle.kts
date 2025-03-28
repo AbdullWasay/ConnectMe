@@ -73,6 +73,9 @@ dependencies {
 
     // ✅ Glide for Image Loading
     implementation("com.github.bumptech.glide:glide:4.15.1")
+    implementation(libs.firebase.messaging.ktx)
+    implementation(libs.firebase.storage.ktx)
+    implementation(libs.androidx.work.runtime.ktx)
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
 
     // ✅ Coroutine Support for Firebase

@@ -48,10 +48,34 @@ import android.view.GestureDetector
 import android.view.ViewGroup
 import android.widget.ProgressBar
 
+// Add these imports at the top of your file if not already present
+import io.agora.rtc2.ChannelMediaOptions
+import io.agora.rtc2.Constants
+import io.agora.rtc2.IRtcEngineEventHandler
+import io.agora.rtc2.RtcEngine
+import io.agora.rtc2.RtcEngineConfig
+import java.util.Timer
+import java.util.TimerTask
+
+
+
+
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private var selectedImageUri: android.net.Uri? = null
     private lateinit var sharedPreferences: SharedPreferences
+
+    // Add these properties to your MainActivity class
+    private var rtcEngine: RtcEngine? = null
+    private var isJoined = false
+    private var isMuted = false
+    private var isSpeakerOn = false
+    private var callTimer: Timer? = null
+    private var callDurationInSeconds = 0
+
+    // Add your Agora App ID - you should get this from your Agora Console
+    private val appId = "7ec9993cf23a4d65b8450b9c4e6a6229" // Replace with your actual Agora App ID
+    private val channelName = "call_channel" // This can be dynamic based on the chat
 
 
     companion object {
@@ -2004,12 +2028,197 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScreen8() {
-        setContentView(R.layout.screen8) // Screen 4 layout
+        setContentView(R.layout.screen8)
 
-        val EndCall = findViewById<ImageView>(R.id.btnEndCall)
-        EndCall.setOnClickListener {
-            //showScreen6()
+        // Get the username from SharedPreferences or from the chat partner
+        val chatPartnerUsername = sharedPreferences.getString(CHAT_PARTNER_USERNAME, "")
+        val chatPartnerName = sharedPreferences.getString(CHAT_PARTNER_NAME, "")
+
+        // Set the user name in the call screen
+        val userNameTextView = findViewById<TextView>(R.id.tvUserName)
+        userNameTextView.text = chatPartnerName
+
+        // Initialize call duration timer
+        val callDurationTextView = findViewById<TextView>(R.id.tvCallDuration)
+        callDurationTextView.text = "00:00"
+
+        // Set up button click listeners
+        val endCallButton = findViewById<ImageView>(R.id.btnEndCall)
+        endCallButton.setOnClickListener {
+            endCall()
         }
+
+        val muteButton = findViewById<ImageView>(R.id.btnMuteToggle)
+        muteButton.setOnClickListener {
+            toggleMute()
+        }
+
+        val speakerButton = findViewById<ImageView>(R.id.btnSpeakerToggle)
+        speakerButton.setOnClickListener {
+            toggleSpeaker()
+        }
+
+        // Initialize Agora SDK and join channel
+        initializeAndJoinChannel()
+
+        // Start call duration timer
+        startCallDurationTimer(callDurationTextView)
+    }
+
+    private fun initializeAndJoinChannel() {
+        try {
+            // Initialize RtcEngine
+            val config = RtcEngineConfig()
+            config.mContext = applicationContext
+            config.mAppId = appId
+            config.mEventHandler = object : IRtcEngineEventHandler() {
+                override fun onJoinChannelSuccess(channel: String, uid: Int, elapsed: Int) {
+                    runOnUiThread {
+                        isJoined = true
+                        Toast.makeText(applicationContext, "Joined Channel Successfully", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onUserJoined(uid: Int, elapsed: Int) {
+                    runOnUiThread {
+                        Toast.makeText(applicationContext, "Remote User Joined", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                override fun onUserOffline(uid: Int, reason: Int) {
+                    runOnUiThread {
+                        Toast.makeText(applicationContext, "Remote User Left", Toast.LENGTH_SHORT).show()
+                        // Optionally end the call if the remote user leaves
+                        // endCall()
+                    }
+                }
+
+                override fun onError(err: Int) {
+                    runOnUiThread {
+                        Toast.makeText(applicationContext, "Error: $err", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            rtcEngine = RtcEngine.create(config)
+
+            // Enable audio
+            rtcEngine?.enableAudio()
+
+            // Set audio profile
+            rtcEngine?.setAudioProfile(
+                Constants.AUDIO_PROFILE_DEFAULT,
+                Constants.AUDIO_SCENARIO_CHATROOM
+            )
+
+            // Join the channel
+            val option = ChannelMediaOptions()
+            option.autoSubscribeAudio = true
+            option.publishMicrophoneTrack = true
+
+            // Generate a temporary token (in production, you should get this from your server)
+            // For testing, you can set Security to "Testing Mode" in Agora Console
+            val token: String? = null // Use null for testing mode or provide a valid token
+
+            // Join the channel
+            rtcEngine?.joinChannel(token, channelName, 0, option)
+
+        } catch (e: Exception) {
+            Toast.makeText(applicationContext, "Error initializing Agora SDK: ${e.message}", Toast.LENGTH_SHORT).show()
+            e.printStackTrace()
+        }
+    }
+
+    private fun toggleMute() {
+        if (rtcEngine != null) {
+            isMuted = !isMuted
+            rtcEngine?.muteLocalAudioStream(isMuted)
+
+            // Update UI to reflect mute state
+            val muteButton = findViewById<ImageView>(R.id.btnMuteToggle)
+            if (isMuted) {
+                // Change button appearance for muted state
+                muteButton.alpha = 0.5f
+                Toast.makeText(this, "Microphone muted", Toast.LENGTH_SHORT).show()
+            } else {
+                // Change button appearance for unmuted state
+                muteButton.alpha = 1.0f
+                Toast.makeText(this, "Microphone unmuted", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun toggleSpeaker() {
+        if (rtcEngine != null) {
+            isSpeakerOn = !isSpeakerOn
+            rtcEngine?.setEnableSpeakerphone(isSpeakerOn)
+
+            // Update UI to reflect speaker state
+            val speakerButton = findViewById<ImageView>(R.id.btnSpeakerToggle)
+            if (isSpeakerOn) {
+                // Change button appearance for speaker on state
+                speakerButton.alpha = 1.0f
+                Toast.makeText(this, "Speaker on", Toast.LENGTH_SHORT).show()
+            } else {
+                // Change button appearance for speaker off state
+                speakerButton.alpha = 0.5f
+                Toast.makeText(this, "Speaker off", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun startCallDurationTimer(timerTextView: TextView) {
+        callDurationInSeconds = 0
+        callTimer = Timer()
+        callTimer?.scheduleAtFixedRate(object : TimerTask() {
+            override fun run() {
+                callDurationInSeconds++
+                val minutes = callDurationInSeconds / 60
+                val seconds = callDurationInSeconds % 60
+                val timeString = String.format("%02d:%02d", minutes, seconds)
+
+                runOnUiThread {
+                    timerTextView.text = timeString
+                }
+            }
+        }, 0, 1000) // Update every second
+    }
+
+    private fun endCall() {
+        // Stop the timer
+        callTimer?.cancel()
+        callTimer = null
+
+        // Leave the channel
+        rtcEngine?.leaveChannel()
+
+        // Reset variables
+        isJoined = false
+        isMuted = false
+        isSpeakerOn = false
+
+        // Return to chat screen
+        val chatPartnerUsername = sharedPreferences.getString(CHAT_PARTNER_USERNAME, "")
+        val chatPartnerName = sharedPreferences.getString(CHAT_PARTNER_NAME, "")
+        val chatId = "${chatPartnerUsername}_${sharedPreferences.getString(KEY_USERNAME, "")}"
+
+        // Get profile pic URL (you might need to adjust this based on your implementation)
+        getUserInfo(chatPartnerUsername ?: "") { name, profilePicUrl ->
+            showScreen6(chatId, chatPartnerUsername ?: "", chatPartnerName ?: "", profilePicUrl)
+        }
+    }
+
+    // Make sure to destroy the RtcEngine when the activity is destroyed
+    override fun onDestroy() {
+        super.onDestroy()
+
+        // Stop timer if it's running
+        callTimer?.cancel()
+
+        // Destroy the RtcEngine instance
+        rtcEngine?.leaveChannel()
+        RtcEngine.destroy()
+        rtcEngine = null
     }
 
     private fun showScreen9() {
@@ -4277,6 +4486,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+
+
 
 }
 

@@ -95,5 +95,4 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
 
-    implementation("io.agora.rtc:voice-sdk:4.5.0")
 }

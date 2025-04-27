@@ -119,13 +119,13 @@
             android:background="@color/white"
             android:textSize="14sp"
             android:layout_weight="1"/>
+
         <ImageView
             android:id="@+id/searchButton"
             android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_height="29dp"
             android:layout_marginTop="5dp"
-            android:src="@drawable/search_icon"
-            />
+            android:src="@drawable/search_icon" />
 
     </LinearLayout>
     <!-- Chat List -->

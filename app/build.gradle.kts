@@ -52,6 +52,11 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
+    implementation ("com.google.firebase:firebase-messaging:23.3.1")
+
+    // For handling notification images
+    implementation ("com.squareup.picasso:picasso:2.8")
+    implementation ("io.agora.rtc:full-sdk:4.0.1")
     // 🔥 Firebase Dependencies
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore.ktx)
@@ -76,7 +81,10 @@ dependencies {
     implementation(libs.firebase.messaging.ktx)
     implementation(libs.firebase.storage.ktx)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.androidx.ui.text.android)
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+
 
     // ✅ Coroutine Support for Firebase
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.6.4")

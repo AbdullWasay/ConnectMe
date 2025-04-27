@@ -26,15 +26,22 @@
         <!-- User Name -->
         <TextView
             android:id="@+id/userName"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_width="178dp"
             android:layout_height="wrap_content"
-            android:text="Henry Benjamin"
-            android:textSize="22sp"
-            android:textStyle="bold"
             android:layout_marginLeft="12dp"
-            android:textColor="@android:color/black"/>
-
+            android:layout_weight="1"
+            android:text="Henry Benjamin"
+            android:textColor="@android:color/black"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/onlineStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Offline"
+            android:textSize="12sp"
+            android:textColor="#808080"
+            android:layout_marginTop="2dp"/>
         <!-- Call & Video Icons -->
         <ImageView
             android:id="@+id/callbutton"

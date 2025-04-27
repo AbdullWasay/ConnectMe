@@ -1,7 +1,6 @@
 package com.example.connectme
 import android.content.Intent
 import android.os.Bundle
-import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.Activity
 import android.content.ContentUris
@@ -20,7 +19,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.content.SharedPreferences
 import android.graphics.Bitmap
-import android.os.Build
+import android.net.Uri
 import android.provider.MediaStore
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -46,12 +45,26 @@ import com.google.firebase.database.FirebaseDatabase
 import com.bumptech.glide.Glide
 import android.view.GestureDetector
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ProgressBar
+import java.io.File
+import java.io.FileOutputStream
+import com.google.firebase.messaging.FirebaseMessaging
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
 
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private var selectedImageUri: android.net.Uri? = null
     private lateinit var sharedPreferences: SharedPreferences
+
+    private val CHAT_IMAGE_GALLERY_REQUEST = 101
+    private val CHAT_IMAGE_CAMERA_REQUEST = 102
+    private val CHAT_VIDEO_GALLERY_REQUEST = 103
+    private val CHAT_VIDEO_CAMERA_REQUEST = 104
 
 
     companion object {
@@ -65,17 +78,52 @@ class MainActivity : AppCompatActivity() {
         private const val PROFILE_IMAGE_REQUEST = 3  // Add this for profile image selection
         private const val CHAT_PARTNER_USERNAME = "chat_partner_username"
         private const val CHAT_PARTNER_NAME = "chat_partner_name"
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 123
+        private const val ONLINE_STATUS_REF = "UserStatus"
+        private const val PRESENCE_REF = "Presence"
     }
 
 
+    private fun saveFCMToken(token: String) {
+        // Get current username
+        val username = sharedPreferences.getString(KEY_USERNAME, null) ?: return
 
+        // Save token to Firebase
+        val database = FirebaseDatabase.getInstance()
+        val tokensRef = database.getReference("FCMTokens")
+
+        tokensRef.child(username).setValue(token)
+            .addOnSuccessListener {
+                Log.d("FCM", "Token saved successfully for user: $username")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FCM", "Failed to save token: ${e.message}")
+            }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         auth = FirebaseAuth.getInstance()
         sharedPreferences = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
+        createNotificationChannels();
+        registerForPushNotifications()
+        // Setup presence system if user is logged in
+        if (isLoggedIn()) {
+            setupPresenceSystem()
+        }
+
+        handleNotificationIntent(intent)
+
         setContentView(R.layout.activity_main) // Screen 1 layout
 
+        if (intent.hasExtra("SHOW_SCREEN")) {
+            val screenToShow = intent.getIntExtra("SHOW_SCREEN", 0)
+            if (screenToShow == 4) {
+                // Navigate to home screen (Screen 4)
+                showScreen4()
+                return
+            }
+        }
         // Check for expired stories
         cleanupExpiredStories()
         showScreen2()
@@ -94,6 +142,188 @@ class MainActivity : AppCompatActivity() {
 
     private fun isLoggedIn(): Boolean {
         return sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false)
+    }
+
+    // Add these overrides to your MainActivity class
+    override fun onResume() {
+        super.onResume()
+        // Set user as online when app is in foreground
+        if (isLoggedIn()) {
+            updateOnlineStatus(true)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Set user as offline when app goes to background
+        if (isLoggedIn()) {
+            updateOnlineStatus(false)
+        }
+    }
+
+    // Add this function to your MainActivity class
+    private fun setupPresenceSystem() {
+        val username = sharedPreferences.getString(KEY_USERNAME, "") ?: return
+
+        val database = FirebaseDatabase.getInstance()
+        val connectedRef = database.getReference(".info/connected")
+        val presenceRef = database.getReference(PRESENCE_REF).child(username)
+        val userStatusRef = database.getReference(ONLINE_STATUS_REF).child(username)
+
+        connectedRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) ?: false
+
+                if (connected) {
+                    // User is connected, add presence entry
+                    presenceRef.setValue(true)
+
+                    // Remove presence when user disconnects
+                    presenceRef.onDisconnect().removeValue()
+
+                    // Update online status
+                    updateOnlineStatus(true)
+
+                    // Set offline status when user disconnects
+                    val offlineStatus = mapOf(
+                        "online" to false,
+                        "lastSeen" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                    )
+                    userStatusRef.onDisconnect().setValue(offlineStatus)
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Presence", "Error setting up presence: ${error.message}")
+            }
+        })
+    }
+
+    // Add this function to update online status
+    private fun updateOnlineStatus(isOnline: Boolean) {
+        val username = sharedPreferences.getString(KEY_USERNAME, "") ?: return
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val userStatusRef = database.getReference(ONLINE_STATUS_REF).child(username)
+
+        // Create status data
+        val statusData = mapOf(
+            "online" to isOnline,
+            "lastSeen" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        )
+
+        // Update status in Firebase
+        userStatusRef.setValue(statusData)
+            .addOnFailureListener { e ->
+                Log.e("OnlineStatus", "Error updating online status: ${e.message}")
+            }
+    }
+
+    // Add this function to check another user's online status
+    private fun checkUserOnlineStatus(username: String, callback: (isOnline: Boolean, lastSeen: String) -> Unit) {
+        val database = FirebaseDatabase.getInstance()
+        val userStatusRef = database.getReference(ONLINE_STATUS_REF).child(username)
+
+        userStatusRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.exists()) {
+                    val online = snapshot.child("online").getValue(Boolean::class.java) ?: false
+                    val lastSeen = snapshot.child("lastSeen").getValue(String::class.java) ?: ""
+                    callback(online, lastSeen)
+                } else {
+                    callback(false, "")
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("OnlineStatus", "Error checking online status: ${error.message}")
+                callback(false, "")
+            }
+        })
+    }
+
+    // Add this helper function to format last seen time
+    private fun formatLastSeen(timestamp: String): String {
+        if (timestamp.isEmpty()) return "recently"
+
+        try {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val lastSeenDate = dateFormat.parse(timestamp) ?: return "recently"
+            val now = Date()
+            val diffInMillis = now.time - lastSeenDate.time
+
+            // Convert to appropriate time unit
+            return when {
+                diffInMillis < 60 * 1000 -> "just now"
+                diffInMillis < 60 * 60 * 1000 -> "${diffInMillis / (60 * 1000)} minutes ago"
+                diffInMillis < 24 * 60 * 60 * 1000 -> "${diffInMillis / (60 * 60 * 1000)} hours ago"
+                diffInMillis < 7 * 24 * 60 * 60 * 1000 -> "${diffInMillis / (24 * 60 * 60 * 1000)} days ago"
+                else -> SimpleDateFormat("MMM dd", Locale.getDefault()).format(lastSeenDate)
+            }
+        } catch (e: Exception) {
+            Log.e("LastSeen", "Error formatting last seen: ${e.message}")
+            return "recently"
+        }
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent?.extras != null) {
+            // Check if opened from a chat notification
+            if (intent.getBooleanExtra("OPEN_CHAT", false)) {
+                val chatId = intent.getStringExtra("CHAT_ID") ?: ""
+                val username = intent.getStringExtra("USERNAME") ?: ""
+
+                if (chatId.isNotEmpty() && username.isNotEmpty()) {
+                    // Get user info to display in chat
+                    getUserInfo(username) { name, profilePicUrl ->
+                        // Open chat screen
+                        showScreen6(chatId, username, name, profilePicUrl)
+                    }
+                    return
+                }
+            }
+
+            // Check if opened from a follow request notification
+            if (intent.getBooleanExtra("OPEN_FOLLOW_REQUESTS", false)) {
+                showScreen19() // Show follow requests screen
+                return
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun registerForPushNotifications() {
+        // Request notification permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        }
+
+        // Get FCM token
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w("FCM", "Fetching FCM registration token failed", task.exception)
+                return@addOnCompleteListener
+            }
+
+            // Get new FCM registration token
+            val token = task.result
+
+            // Log and save the token
+            Log.d("FCM", "FCM Token: $token")
+            saveFCMToken(token)
+        }
     }
 
     private fun saveUserCredentials(username: String, name: String, email: String, phone: String, bio: String = "") {
@@ -192,7 +422,22 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    // Add this to your MainActivity after successful login (in loginUser method)
+    private fun registerFCMToken() {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w("FCM", "Fetching FCM registration token failed", task.exception)
+                return@addOnCompleteListener
+            }
 
+            // Get new FCM registration token
+            val token = task.result
+
+            // Log and save the token
+            Log.d("FCM", "FCM Token: $token")
+            saveFCMToken(token)
+        }
+    }
     private fun loginUser(username: String, password: String) {
         val database = FirebaseDatabase.getInstance()
         val usersRef = database.getReference("Users")
@@ -209,6 +454,12 @@ class MainActivity : AppCompatActivity() {
                     // Save credentials to SharedPreferences
                     saveUserCredentials(username, name, email, phone)
 
+                    setupPresenceSystem()
+
+                    // Update online status
+                    updateOnlineStatus(true)
+
+                    registerFCMToken();
                     Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
                     showScreen4() // Navigate to home screen
                 } else {
@@ -280,6 +531,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun logout() {
+        updateOnlineStatus(false)
+
+        val username = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (username.isNotEmpty()) {
+            val database = FirebaseDatabase.getInstance()
+            val presenceRef = database.getReference(PRESENCE_REF).child(username)
+            presenceRef.removeValue()
+        }
+
+
         clearUserCredentials()
         showScreen2() // Go back to login screen
     }
@@ -468,6 +729,51 @@ class MainActivity : AppCompatActivity() {
                     Log.e("FetchStories", "Error fetching story for $username: ${error.message}")
                 }
             })
+        }
+    }
+
+    private fun createNotificationChannels() {
+        // Only needed for Android 8.0 (API level 26) and higher
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Messages channel
+            val messagesChannel = NotificationChannel(
+                "channel_messages",
+                "Messages",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for new messages"
+                enableLights(true)
+                enableVibration(true)
+            }
+
+            // Follow requests channel
+            val requestsChannel = NotificationChannel(
+                "channel_requests",
+                "Follow Requests",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for follow requests"
+                enableLights(true)
+                enableVibration(true)
+            }
+
+            // Alerts channel
+            val alertsChannel = NotificationChannel(
+                "channel_alerts",
+                "Security Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for security alerts like screenshots"
+                enableLights(true)
+                enableVibration(true)
+            }
+
+            // Register the channels with the system
+            notificationManager.createNotificationChannels(
+                listOf(messagesChannel, requestsChannel, alertsChannel)
+            )
         }
     }
 
@@ -1100,6 +1406,7 @@ class MainActivity : AppCompatActivity() {
     // Update the createChatItemView function to include the last message:
 
     // Function to create a chat item view
+    // Modify your createChatItemView function to show online status
     private fun createChatItemView(chatId: String, username: String, name: String, profilePicUrl: String, lastMessage: String = ""): View {
         // Create a horizontal layout for the chat item
         val itemLayout = LinearLayout(this).apply {
@@ -1112,13 +1419,36 @@ class MainActivity : AppCompatActivity() {
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
 
+        // Create profile image container with online indicator
+        val profileContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+        }
+
         // Create profile image
         val profileImageView = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
             background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
             scaleType = ImageView.ScaleType.CENTER_CROP
             clipToOutline = true
         }
+
+        // Create online status indicator
+        val onlineIndicator = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(12.dpToPx(), 12.dpToPx()).apply {
+                gravity = Gravity.BOTTOM or Gravity.END
+                setMargins(0, 0, 2.dpToPx(), 2.dpToPx())
+            }
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.story_circle)
+            setBackgroundColor(android.graphics.Color.GRAY) // Default offline color
+            visibility = View.INVISIBLE // Hide initially
+        }
+
+        // Add views to profile container
+        profileContainer.addView(profileImageView)
+        profileContainer.addView(onlineIndicator)
 
         // Load profile image
         if (profilePicUrl.isNotEmpty()) {
@@ -1173,9 +1503,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Add views to the main layout
-        itemLayout.addView(profileImageView)
+        itemLayout.addView(profileContainer)
         itemLayout.addView(textContainer)
         itemLayout.addView(cameraIcon)
+
+        // Check and update online status
+        checkUserOnlineStatus(username) { isOnline, _ ->
+            runOnUiThread {
+                if (isOnline) {
+                    onlineIndicator.setBackgroundColor(android.graphics.Color.parseColor("#4CAF50")) // Green
+                    onlineIndicator.visibility = View.VISIBLE
+                } else {
+                    onlineIndicator.visibility = View.INVISIBLE
+                }
+            }
+        }
 
         // Set click listener to open chat
         itemLayout.setOnClickListener {
@@ -1191,7 +1533,6 @@ class MainActivity : AppCompatActivity() {
 
         return itemLayout
     }
-
     // Function to filter chats by search query
     private fun filterChats(query: String, username: String, container: LinearLayout) {
         // This is a simple client-side filtering
@@ -1575,10 +1916,75 @@ class MainActivity : AppCompatActivity() {
 
     private fun showScreen6(chatId: String, username: String, name: String, profilePicUrl: String) {
         setContentView(R.layout.screen6)
-
+        currentChatId = chatId
         // Set user name in the header
         val userNameTextView = findViewById<TextView>(R.id.userName)
         userNameTextView.text = name
+
+
+        // Create online status text view
+        val onlineStatusView = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            textSize = 12f
+            text = "Offline"
+            setTextColor(android.graphics.Color.GRAY)
+        }
+
+        // Find the parent layout that contains the username
+        val topBarLayout = findViewById<LinearLayout>(R.id.rootLayout)?.findViewWithTag<LinearLayout>("topBar")
+
+        if (topBarLayout != null) {
+            // Add status view after username
+            val userNameIndex = topBarLayout.indexOfChild(userNameTextView)
+            if (userNameIndex != -1) {
+                topBarLayout.addView(onlineStatusView, userNameIndex + 1)
+            }
+        } else {
+            // If we can't find the top bar, add it directly to the root layout
+            val rootLayout = findViewById<LinearLayout>(R.id.rootLayout)
+
+            // Create a container for username and status
+            val userInfoContainer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1.0f
+                )
+            }
+
+            // Remove username from its current parent
+            (userNameTextView.parent as? ViewGroup)?.removeView(userNameTextView)
+
+            // Add username and status to container
+            userInfoContainer.addView(userNameTextView)
+            userInfoContainer.addView(onlineStatusView)
+
+            // Find the top bar horizontal layout
+            val horizontalLayout = rootLayout.getChildAt(0) as? LinearLayout
+            if (horizontalLayout != null) {
+                // Add container after back button
+                horizontalLayout.addView(userInfoContainer, 1)
+            }
+        }
+
+        // Check and update online status in real-time
+        checkUserOnlineStatus(username) { isOnline, lastSeen ->
+            runOnUiThread {
+                if (isOnline) {
+                    onlineStatusView.text = "Online"
+                    onlineStatusView.setTextColor(android.graphics.Color.parseColor("#4CAF50")) // Green
+                } else {
+                    val lastSeenText = formatLastSeen(lastSeen)
+                    onlineStatusView.text = "Last seen $lastSeenText"
+                    onlineStatusView.setTextColor(android.graphics.Color.GRAY)
+                }
+            }
+        }
+
 
         // Set profile image
         val profileImageView = findViewById<ImageView>(R.id.profileImage)
@@ -1592,6 +1998,16 @@ class MainActivity : AppCompatActivity() {
             profileImageView.setImageResource(R.drawable.profilepic3)
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.decorView.setOnApplyWindowInsetsListener { view, insets ->
+                if (insets.isScreenshotTaken()) {
+                    // Screenshot detected, send notification
+                    sendScreenshotNotification(username, chatId)
+                    Toast.makeText(this, "Screenshot detected", Toast.LENGTH_SHORT).show()
+                }
+                view.onApplyWindowInsets(insets)
+            }
+        }
         // Set up back button
         val backButton = findViewById<ImageView>(R.id.BackButton)
         backButton.setOnClickListener {
@@ -1614,6 +2030,11 @@ class MainActivity : AppCompatActivity() {
         viewProfileButton.setOnClickListener {
             viewUserProfile(username)
         }
+        val attachmentButton = findViewById<ImageView>(R.id.attachmentButton)
+        attachmentButton.setOnClickListener {
+            showMediaSelectionDialog(chatId, username)
+        }
+
 
         // Get message container
         val messageContainer = findViewById<LinearLayout>(R.id.messageContainer)
@@ -1658,7 +2079,73 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // Function to load messages from Firebase
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.P)
+    fun android.view.WindowInsets.isScreenshotTaken(): Boolean {
+        return this.displayCutout != null
+    }
+
+    private fun showMediaSelectionDialog(chatId: String, recipientUsername: String) {
+        val options = arrayOf("Photo from Gallery", "Take Photo", "Video from Gallery", "Record Video")
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Send Media")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> openGalleryForImage(chatId, recipientUsername)
+                    1 -> openCameraForImage(chatId, recipientUsername)
+                    2 -> openGalleryForVideo(chatId, recipientUsername)
+                    3 -> openCameraForVideo(chatId, recipientUsername)
+                }
+            }
+            .show()
+    }
+
+
+    // Store the current chat info for when we return from camera/gallery
+    private var currentChatId = ""
+    private var currentRecipientUsername = ""
+
+    private fun openGalleryForImage(chatId: String, recipientUsername: String) {
+        if (checkAndRequestPermissions()) {
+            currentChatId = chatId
+            currentRecipientUsername = recipientUsername
+
+            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+            startActivityForResult(intent, CHAT_IMAGE_GALLERY_REQUEST)
+        }
+    }
+
+    private fun openCameraForImage(chatId: String, recipientUsername: String) {
+        if (checkCameraPermission()) {
+            currentChatId = chatId
+            currentRecipientUsername = recipientUsername
+
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            startActivityForResult(intent, CHAT_IMAGE_CAMERA_REQUEST)
+        }
+    }
+
+    private fun openGalleryForVideo(chatId: String, recipientUsername: String) {
+        if (checkAndRequestPermissions()) {
+            currentChatId = chatId
+            currentRecipientUsername = recipientUsername
+
+            val intent = Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            startActivityForResult(intent, CHAT_VIDEO_GALLERY_REQUEST)
+        }
+    }
+
+    private fun openCameraForVideo(chatId: String, recipientUsername: String) {
+        if (checkCameraPermission()) {
+            currentChatId = chatId
+            currentRecipientUsername = recipientUsername
+
+            val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE)
+            intent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, 30) // Limit to 30 seconds
+            startActivityForResult(intent, CHAT_VIDEO_CAMERA_REQUEST)
+        }
+    }
+    // Modify your loadMessages method to handle the new message structure
     private fun loadMessages(chatId: String, container: LinearLayout) {
         // Clear existing views
         container.removeAllViews()
@@ -1694,39 +2181,53 @@ class MainActivity : AppCompatActivity() {
                     val messagesList = ArrayList<Map<String, Any>>()
 
                     for (messageSnapshot in snapshot.children) {
+                        val messageId = messageSnapshot.key ?: continue
                         val messageData = messageSnapshot.value as? Map<*, *> ?: continue
 
                         // Get message details
                         val sender = messageData["sender"] as? String ?: ""
-                        val text = messageData["text"] as? String ?: ""
+                        val text = messageData["text"] as? String
+                        val mediaType = messageData["mediaType"] as? String
+                        val media = messageData["media"] as? String
                         val timestamp = messageData["timestamp"] as? String ?: ""
                         val time = formatMessageTime(timestamp)
+                        val edited = messageData["edited"] as? Boolean ?: false
 
                         // Create a map with message info
-                        val messageInfo = mapOf(
+                        val messageInfo = mutableMapOf<String, Any>(
+                            "messageId" to messageId,  // Include the message ID
                             "sender" to sender,
-                            "text" to text,
                             "timestamp" to timestamp,
                             "time" to time
                         )
 
+                        // Add edited flag if present
+                        if (edited) {
+                            messageInfo["edited"] = true
+                        }
+
+                        // Add text or media info
+                        if (mediaType != null && media != null) {
+                            messageInfo["mediaType"] = mediaType
+                            messageInfo["media"] = media
+                        } else if (text != null) {
+                            messageInfo["text"] = text
+                        }
+
                         messagesList.add(messageInfo)
                     }
-
                     // Sort messages by timestamp
                     messagesList.sortBy { it["timestamp"] as String }
 
                     // Display each message
                     for (messageInfo in messagesList) {
                         val sender = messageInfo["sender"] as String
-                        val text = messageInfo["text"] as String
-                        val time = messageInfo["time"] as String
 
                         // Create message view based on sender
                         val messageView = if (sender == currentUsername) {
-                            createOutgoingMessageView(text, time)
+                            createOutgoingMessageView(messageInfo)
                         } else {
-                            createIncomingMessageView(text, time)
+                            createIncomingMessageView(messageInfo)
                         }
 
                         container.addView(messageView)
@@ -1741,7 +2242,12 @@ class MainActivity : AppCompatActivity() {
                     // Update last seen message in Chats
                     val lastMessage = messagesList.lastOrNull()
                     if (lastMessage != null) {
-                        updateLastMessage(chatId, lastMessage["text"] as String, lastMessage["timestamp"] as String)
+                        val lastMessageText = if (lastMessage.containsKey("mediaType")) {
+                            "[${(lastMessage["mediaType"] as String).capitalize()}]"
+                        } else {
+                            lastMessage["text"] as String
+                        }
+                        updateLastMessage(chatId, lastMessageText, lastMessage["timestamp"] as String)
                     }
                 }
 
@@ -1760,8 +2266,8 @@ class MainActivity : AppCompatActivity() {
                 }
             })
     }
-
     // Function to send a message
+    // Modify your sendMessage function to include messageId in the message data
     private fun sendMessage(chatId: String, recipientUsername: String, messageText: String, container: LinearLayout) {
         // Get current username
         val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
@@ -1773,15 +2279,6 @@ class MainActivity : AppCompatActivity() {
         // Get current timestamp
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
 
-        // Create message data
-        val messageData = mapOf(
-            "sender" to currentUsername,
-            "recipient" to recipientUsername,
-            "text" to messageText,
-            "timestamp" to timestamp,
-            "read" to false
-        )
-
         // Get reference to Firebase database
         val database = FirebaseDatabase.getInstance()
         val messagesRef = database.getReference("Messages").child(chatId)
@@ -1789,11 +2286,23 @@ class MainActivity : AppCompatActivity() {
         // Generate a unique message ID
         val messageId = messagesRef.push().key ?: UUID.randomUUID().toString()
 
+        // Create message data - now including messageId in the data itself
+        val messageData = mapOf(
+            "messageId" to messageId,  // Include the message ID in the data
+            "sender" to currentUsername,
+            "recipient" to recipientUsername,
+            "text" to messageText,
+            "timestamp" to timestamp,
+            "read" to false
+        )
+
         // Save message to Firebase
         messagesRef.child(messageId).setValue(messageData)
             .addOnSuccessListener {
                 // Message sent successfully
-                // The ValueEventListener will update the UI
+
+                // Send notification to recipient
+                sendNewMessageNotification(recipientUsername, messageText, chatId)
 
                 // Update last message in Chats
                 updateLastMessage(chatId, messageText, timestamp)
@@ -1802,7 +2311,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Failed to send message: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
-
     // Function to update last message in Chats
     private fun updateLastMessage(chatId: String, lastMessage: String, timestamp: String) {
         val database = FirebaseDatabase.getInstance()
@@ -1819,63 +2327,37 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    // Function to create an outgoing message view (sent by current user)
-    private fun createOutgoingMessageView(message: String, time: String): View {
-        // Create a container for the message
-        val messageLayout = LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
-            }
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.END
+    // Modify your createIncomingMessageView and createOutgoingMessageView methods to handle media
+
+    private fun isMessageEditable(messageTimestamp: String): Boolean {
+        try {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val messageTime = dateFormat.parse(messageTimestamp) ?: return false
+            val currentTime = Date()
+
+            // Calculate time difference in milliseconds
+            val diffInMillis = currentTime.time - messageTime.time
+
+            // Convert 5 minutes to milliseconds (5 * 60 * 1000)
+            val fiveMinutesInMillis = 5 * 60 * 1000
+
+            // Return true if the message is less than 5 minutes old
+            return diffInMillis <= fiveMinutesInMillis
+        } catch (e: Exception) {
+            Log.e("MessageEdit", "Error checking message time: ${e.message}")
+            return false
         }
-
-        // Create message bubble
-        val messageBubble = LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
-            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
-        }
-
-        // Create message text
-        val messageText = TextView(this).apply {
-            text = message  // Fixed issue by renaming the parameter
-            textSize = 14f
-            setTextColor(android.graphics.Color.BLACK)
-        }
-
-        // Create time text
-        val timeText = TextView(this).apply {
-            text = time
-            textSize = 12f
-            setTextColor(android.graphics.Color.GRAY)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.END
-                topMargin = 1.dpToPx()
-            }
-        }
-
-        // Add message text to bubble
-        messageBubble.addView(messageText)
-
-        // Add views to layout
-        messageLayout.addView(messageBubble)
-        messageLayout.addView(timeText)
-
-        return messageLayout
     }
 
-    // Function to create an incoming message view (received from other user)
-    private fun createIncomingMessageView(message: String, time: String): View {
+
+    // For incoming messages
+    private fun createIncomingMessageView(message: Map<String, Any>): View {
+        val sender = message["sender"] as String
+        val time = message["time"] as String
+        val mediaType = message["mediaType"] as? String
+        val media = message["media"] as? String
+        val text = message["text"] as? String
+
         // Create a horizontal layout to hold the profile image and message bubble
         val messageLayout = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -1912,18 +2394,91 @@ class MainActivity : AppCompatActivity() {
             )
             background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
             setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+            orientation = LinearLayout.VERTICAL
         }
 
-        // Create message text
-        val messageText = TextView(this).apply {
-            text = message  // Fixed issue by renaming the parameter
-            textSize = 14f
-            setTextColor(android.graphics.Color.BLACK)
+        // Check if this is a media message
+        if (mediaType != null && media != null) {
+            when (mediaType) {
+                "image" -> {
+                    // Create image view for the image
+                    val imageView = ImageView(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(200.dpToPx(), 200.dpToPx())
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    }
+
+                    // Load the image from base64
+                    try {
+                        val imageBytes = Base64.decode(media, Base64.DEFAULT)
+                        val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                        imageView.setImageBitmap(decodedImage)
+                    } catch (e: Exception) {
+                        Log.e("DisplayImage", "Error decoding image: ${e.message}")
+                        imageView.setImageResource(R.drawable.profile_pictures_border)
+                    }
+
+                    // Add image view to bubble
+                    messageBubble.addView(imageView)
+
+                    // Set click listener to view full image
+                    imageView.setOnClickListener {
+                        showFullScreenImage(media)
+                    }
+                }
+                "video" -> {
+                    // Create a thumbnail with play button
+                    val videoContainer = FrameLayout(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(200.dpToPx(), 200.dpToPx())
+                    }
+
+                    // Create thumbnail image
+                    val thumbnailView = ImageView(this).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT
+                        )
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        setImageResource(R.drawable.profile_pictures_border) // Default placeholder
+                    }
+
+                    // Create play button overlay
+                    val playButton = ImageView(this).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            50.dpToPx(),
+                            50.dpToPx(),
+                            Gravity.CENTER
+                        )
+                        setImageResource(R.drawable.videocall_icon) // Use your play icon
+                    }
+
+                    // Add views to container
+                    videoContainer.addView(thumbnailView)
+                    videoContainer.addView(playButton)
+
+                    // Add video container to bubble
+                    messageBubble.addView(videoContainer)
+
+                    // Set click listener to play video
+                    videoContainer.setOnClickListener {
+                        playVideo(media)
+                    }
+                }
+            }
+        } else if (text != null) {
+            // Create message text for regular text messages
+            val messageText = TextView(this).apply {
+                this.text = text
+                textSize = 14f
+                setTextColor(android.graphics.Color.BLACK)
+            }
+
+            // Add message text to bubble
+            messageBubble.addView(messageText)
         }
 
         // Create time text
         val timeText = TextView(this).apply {
-            text = time
+            this.text = time
             textSize = 12f
             setTextColor(android.graphics.Color.GRAY)
             layoutParams = LinearLayout.LayoutParams(
@@ -1934,9 +2489,6 @@ class MainActivity : AppCompatActivity() {
                 topMargin = 2.dpToPx()
             }
         }
-
-        // Add message text to bubble
-        messageBubble.addView(messageText)
 
         // Add message bubble and time text to container
         messageContainer.addView(messageBubble)
@@ -1949,6 +2501,315 @@ class MainActivity : AppCompatActivity() {
         return messageLayout
     }
 
+    private fun showFullScreenImage(base64Image: String) {
+        try {
+            // Create a dialog to show the full-size image
+            val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            dialog.setContentView(R.layout.screen21fullscreenimage)
+
+            // Get the ImageView from the dialog layout
+            val imageView = dialog.findViewById<ImageView>(R.id.fullscreenImageView)
+
+            // Convert base64 to bitmap and display
+            val imageBytes = Base64.decode(base64Image, Base64.DEFAULT)
+            val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            imageView.setImageBitmap(decodedImage)
+
+            // Set click listener to close the dialog
+            imageView.setOnClickListener {
+                dialog.dismiss()
+            }
+
+            // Show the dialog
+            dialog.show()
+        } catch (e: Exception) {
+            Log.e("FullScreenImage", "Error showing image: ${e.message}")
+            Toast.makeText(this, "Error displaying image", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun playVideo(base64Video: String) {
+        try {
+            // Create a temporary file to store the video
+            val videoFile = File(cacheDir, "temp_video_${System.currentTimeMillis()}.mp4")
+
+            // Convert base64 to file
+            val videoBytes = Base64.decode(base64Video, Base64.DEFAULT)
+            FileOutputStream(videoFile).use { it.write(videoBytes) }
+
+            // Create intent to play video
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.setDataAndType(Uri.fromFile(videoFile), "video/*")
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+            // Start video player
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("PlayVideo", "Error playing video: ${e.message}")
+            Toast.makeText(this, "Error playing video", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // For outgoing messages (similar structure but right-aligned)
+    private fun createOutgoingMessageView(message: Map<String, Any>): View {
+        val time = message["time"] as String
+        val timestamp = message["timestamp"] as String
+        val mediaType = message["mediaType"] as? String
+        val media = message["media"] as? String
+        val text = message["text"] as? String
+        val messageId = message["messageId"] as? String ?: ""
+        val chatId = currentChatId  // Get the current chat ID
+        // Create a container for the message
+        val messageLayout = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
+            }
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END
+        }
+
+        // Create message bubble
+        val messageBubble = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.viewprofile_button)
+            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+            orientation = LinearLayout.VERTICAL
+
+            // Add long-press listener for edit/delete options
+            setOnLongClickListener {
+                // Only show options for text messages (not media) and only if editable
+                if (text != null && messageId.isNotEmpty() && isMessageEditable(timestamp)) {
+                    showMessageOptions(chatId, messageId, text, timestamp)
+                    true
+                } else {
+                    // If not editable, show a toast explaining why
+                    if (text != null && messageId.isNotEmpty()) {
+                        Toast.makeText(this@MainActivity, "Messages can only be edited within 5 minutes", Toast.LENGTH_SHORT).show()
+                    }
+                    false
+                }
+            }
+        }
+
+        // Check if this is a media message
+        if (mediaType != null && media != null) {
+            when (mediaType) {
+                "image" -> {
+                    // Create image view for the image
+                    val imageView = ImageView(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(200.dpToPx(), 200.dpToPx())
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    }
+
+                    // Load the image from base64
+                    try {
+                        val imageBytes = Base64.decode(media, Base64.DEFAULT)
+                        val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                        imageView.setImageBitmap(decodedImage)
+                    } catch (e: Exception) {
+                        Log.e("DisplayImage", "Error decoding image: ${e.message}")
+                        imageView.setImageResource(R.drawable.profile_pictures_border)
+                    }
+
+                    // Add image view to bubble
+                    messageBubble.addView(imageView)
+
+                    // Set click listener to view full image
+                    imageView.setOnClickListener {
+                        showFullScreenImage(media)
+                    }
+                }
+                "video" -> {
+                    // Create a thumbnail with play button
+                    val videoContainer = FrameLayout(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(200.dpToPx(), 200.dpToPx())
+                    }
+
+                    // Create thumbnail image
+                    val thumbnailView = ImageView(this).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT
+                        )
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        setImageResource(R.drawable.profile_pictures_border) // Default placeholder
+                    }
+
+                    // Create play button overlay
+                    val playButton = ImageView(this).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            50.dpToPx(),
+                            50.dpToPx(),
+                            Gravity.CENTER
+                        )
+                        setImageResource(R.drawable.videocall_icon) // Use your play icon
+                    }
+
+                    // Add views to container
+                    videoContainer.addView(thumbnailView)
+                    videoContainer.addView(playButton)
+
+                    // Add video container to bubble
+                    messageBubble.addView(videoContainer)
+
+                    // Set click listener to play video
+                    videoContainer.setOnClickListener {
+                        playVideo(media)
+                    }
+                }
+            }
+        } else if (text != null) {
+            // Create message text for regular text messages
+            val messageText = TextView(this).apply {
+                this.text = text
+                textSize = 14f
+                setTextColor(android.graphics.Color.BLACK)
+            }
+
+            // Add message text to bubble
+            messageBubble.addView(messageText)
+        }
+
+        // Create time text
+        val timeText = TextView(this).apply {
+            this.text = time
+            textSize = 12f
+            setTextColor(android.graphics.Color.GRAY)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.END
+                topMargin = 1.dpToPx()
+            }
+        }
+
+        // Add views to layout
+        messageLayout.addView(messageBubble)
+        messageLayout.addView(timeText)
+
+
+        return messageLayout
+    }
+
+    private fun showMessageOptions(chatId: String, messageId: String, currentText: String, timestamp: String) {
+        val options = arrayOf("Edit Message", "Delete Message")
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Message Options")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showEditMessageDialog(chatId, messageId, currentText)
+                    1 -> showDeleteConfirmation(chatId, messageId)
+                }
+            }
+            .show()
+    }
+
+    // 4. Update the edit dialog function to include chatId
+    private fun showEditMessageDialog(chatId: String, messageId: String, currentText: String) {
+        val editText = EditText(this).apply {
+            setText(currentText)
+            setSelection(currentText.length) // Place cursor at the end
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(20.dpToPx(), 10.dpToPx(), 20.dpToPx(), 10.dpToPx())
+            }
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(editText)
+            setPadding(20.dpToPx(), 10.dpToPx(), 20.dpToPx(), 10.dpToPx())
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Edit Message")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                val newText = editText.text.toString().trim()
+                if (newText.isNotEmpty()) {
+                    updateMessage(chatId, messageId, newText)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // 5. Update the delete confirmation function to include chatId
+    private fun showDeleteConfirmation(chatId: String, messageId: String) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Delete Message")
+            .setMessage("Are you sure you want to delete this message?")
+            .setPositiveButton("Delete") { _, _ ->
+                deleteMessage(chatId, messageId)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // 6. Update the message update function to use the passed chatId
+    private fun updateMessage(chatId: String, messageId: String, newText: String) {
+        if (chatId.isEmpty()) {
+            Toast.makeText(this, "Error: Chat ID not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val messageRef = database.getReference("Messages").child(chatId).child(messageId)
+
+        // Update only the text field
+        val updates = HashMap<String, Any>()
+        updates["text"] = newText
+        updates["edited"] = true // Mark as edited
+
+        // Update in Firebase
+        messageRef.updateChildren(updates)
+            .addOnSuccessListener {
+                Toast.makeText(this, "Message updated", Toast.LENGTH_SHORT).show()
+
+                // Refresh the messages
+                val messageContainer = findViewById<LinearLayout>(R.id.messageContainer)
+                loadMessages(chatId, messageContainer)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to update message: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // 7. Update the message delete function to use the passed chatId
+    private fun deleteMessage(chatId: String, messageId: String) {
+        if (chatId.isEmpty()) {
+            Toast.makeText(this, "Error: Chat ID not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Get reference to Firebase database
+        val database = FirebaseDatabase.getInstance()
+        val messageRef = database.getReference("Messages").child(chatId).child(messageId)
+
+        // Delete the message
+        messageRef.removeValue()
+            .addOnSuccessListener {
+                Toast.makeText(this, "Message deleted", Toast.LENGTH_SHORT).show()
+
+                // Refresh the messages
+                val messageContainer = findViewById<LinearLayout>(R.id.messageContainer)
+                loadMessages(chatId, messageContainer)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to delete message: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
     // Function to format message timestamp to a readable time
     private fun formatMessageTime(timestamp: String): String {
         try {
@@ -2003,21 +2864,37 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun showScreen8() {
-        setContentView(R.layout.screen8) // Screen 4 layout
 
-        val EndCall = findViewById<ImageView>(R.id.btnEndCall)
-        EndCall.setOnClickListener {
-            //showScreen6()
+    private fun showScreen8() {
+        // Launch audio call
+        val chatId = currentChatId
+        val username = sharedPreferences.getString(CHAT_PARTNER_USERNAME, "") ?: ""
+
+        if (chatId.isNotEmpty() && username.isNotEmpty()) {
+            val intent = Intent(this, AgoraCallActivity::class.java)
+            intent.putExtra("IS_VIDEO_CALL", false)
+            intent.putExtra("CHAT_ID", chatId)
+            intent.putExtra("REMOTE_USERNAME", username)
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "Cannot start call: Missing chat information", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun showScreen9() {
-        setContentView(R.layout.screen9) // Screen 4 layout
 
-        val EndCall = findViewById<ImageView>(R.id.btnEndCall)
-        EndCall.setOnClickListener {
-            // showScreen6()
+    private fun showScreen9() {
+        // Launch video call
+        val chatId = currentChatId
+        val username = sharedPreferences.getString(CHAT_PARTNER_USERNAME, "") ?: ""
+
+        if (chatId.isNotEmpty() && username.isNotEmpty()) {
+            val intent = Intent(this, AgoraCallActivity::class.java)
+            intent.putExtra("IS_VIDEO_CALL", true)
+            intent.putExtra("CHAT_ID", chatId)
+            intent.putExtra("REMOTE_USERNAME", username)
+            startActivity(intent)
+        } else {
+            Toast.makeText(this, "Cannot start call: Missing chat information", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -2196,6 +3073,20 @@ class MainActivity : AppCompatActivity() {
             loadUserPosts(username)
         } else {
             Toast.makeText(this, "Cannot load posts: Username not found", Toast.LENGTH_SHORT).show()
+        }
+
+        // Add this inside your showScreen10() function
+        val logoutButton = findViewById<ImageButton>(R.id.Logout)
+        logoutButton.setOnClickListener {
+            // Show confirmation dialog before logging out
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Yes") { _, _ ->
+                    logout() // Call the existing logout function
+                }
+                .setNegativeButton("No", null)
+                .show()
         }
     }
 
@@ -2666,7 +3557,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function to start a chat with a user
-
     private fun showScreen13() {
         setContentView(R.layout.screen13)
 
@@ -2684,15 +3574,52 @@ class MainActivity : AppCompatActivity() {
         val nameEditText = findViewById<EditText>(R.id.nameEditText)
         val usernameEditText = findViewById<EditText>(R.id.usernameEditText)
         val phoneEditText = findViewById<EditText>(R.id.phoneEditText)
-        val bioTextView = findViewById<TextView>(R.id.textView)
+        val bioEditText = findViewById<EditText>(R.id.bioEditText) // Changed to EditText
         val profileNameTextView = findViewById<TextView>(R.id.profileNameTextView)
+        val profileImage = findViewById<ImageView>(R.id.profileImage)
+        val cameraIcon = findViewById<ImageView>(R.id.cameraIcon)
 
         // Set the current values
         nameEditText.setText(name)
         usernameEditText.setText(username)
         phoneEditText.setText(phone)
-        bioTextView.text = bio
+        bioEditText.setText(bio)
         profileNameTextView.text = name
+
+        // Load existing profile picture if available
+        if (!username.isNullOrEmpty()) {
+            val database = FirebaseDatabase.getInstance()
+            val userRef = database.getReference("Users").child(username)
+
+            userRef.child("profilePicUrl").addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val profilePicUrl = snapshot.getValue(String::class.java)
+                    if (!profilePicUrl.isNullOrEmpty()) {
+                        try {
+                            val imageBytes = Base64.decode(profilePicUrl, Base64.DEFAULT)
+                            val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                            profileImage.setImageBitmap(decodedImage)
+                            profileImage.alpha = 1.0f
+                        } catch (e: Exception) {
+                            Log.e("ProfilePic", "Error loading profile picture: ${e.message}")
+                        }
+                    }
+                }
+
+                override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                    Log.e("ProfilePic", "Error loading profile picture: ${error.message}")
+                }
+            })
+        }
+
+        // Handle profile image change
+        cameraIcon.setOnClickListener {
+            updateProfilePicture()
+        }
+
+        profileImage.setOnClickListener {
+            updateProfilePicture()
+        }
 
         // Handle the Done button click
         val doneEditing = findViewById<TextView>(R.id.DoneEditing)
@@ -2701,7 +3628,7 @@ class MainActivity : AppCompatActivity() {
             val updatedName = nameEditText.text.toString()
             val updatedUsername = usernameEditText.text.toString()
             val updatedPhone = phoneEditText.text.toString()
-            val updatedBio = bioTextView.text.toString()
+            val updatedBio = bioEditText.text.toString()
 
             Log.d("EditProfile", "Updated values: name=$updatedName, username=$updatedUsername, phone=$updatedPhone, bio=$updatedBio")
 
@@ -2711,29 +3638,31 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            if (username.isNullOrEmpty()) {
+                Toast.makeText(this, "Error: Username is missing", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             // Show a loading indicator
             Toast.makeText(this, "Updating profile...", Toast.LENGTH_SHORT).show()
 
-            // For simplicity, let's just update the SharedPreferences directly and go back to screen 10
-            // This will help us determine if the issue is with Firebase or something else
-            saveUserCredentials(username ?: "", updatedName, email ?: "", updatedPhone, updatedBio)
+            // Update SharedPreferences
+            saveUserCredentials(username, updatedName, email ?: "", updatedPhone, updatedBio)
             Toast.makeText(this, "Profile updated in SharedPreferences", Toast.LENGTH_SHORT).show()
 
-            // Now let's try to update Firebase
+            // Update Firebase
             try {
                 val database = FirebaseDatabase.getInstance()
                 val usersRef = database.getReference("Users")
 
                 Log.d("EditProfile", "Updating Firebase at path: Users/$username")
 
-                // Create a map of fields to update
                 val updates = HashMap<String, Any>()
                 updates["name"] = updatedName
                 updates["phone"] = updatedPhone
                 updates["bio"] = updatedBio
 
-                // Update in Firebase with more detailed callbacks
-                usersRef.child(username ?: "").updateChildren(updates)
+                usersRef.child(username).updateChildren(updates)
                     .addOnSuccessListener {
                         Log.d("EditProfile", "Firebase update successful")
                         Toast.makeText(this, "Profile updated successfully", Toast.LENGTH_SHORT).show()
@@ -2742,7 +3671,6 @@ class MainActivity : AppCompatActivity() {
                     .addOnFailureListener { e ->
                         Log.e("EditProfile", "Firebase update failed: ${e.message}", e)
                         Toast.makeText(this, "Firebase update failed: ${e.message}", Toast.LENGTH_LONG).show()
-                        // Still go to screen 10 since we updated SharedPreferences
                         showScreen10()
                     }
                     .addOnCompleteListener {
@@ -2751,22 +3679,11 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e("EditProfile", "Exception during Firebase update: ${e.message}", e)
                 Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                // Still go to screen 10 since we updated SharedPreferences
                 showScreen10()
             }
         }
-
-        // Handle profile image change
-        val cameraIcon = findViewById<ImageView>(R.id.cameraIcon)
-        cameraIcon.setOnClickListener {
-            // Open image picker
-            if (checkAndRequestPermissions()) {
-                val intent = Intent(Intent.ACTION_PICK)
-                intent.type = "image/*"
-                startActivityForResult(intent, PROFILE_IMAGE_REQUEST)
-            }
-        }
     }
+
     private fun updateUserProfile(username: String, name: String, phone: String, email: String, bio: String) {
         val database = FirebaseDatabase.getInstance()
         val usersRef = database.getReference("Users")
@@ -3166,12 +4083,145 @@ class MainActivity : AppCompatActivity() {
                 // Update button state
                 followButton.text = "Requested"
                 Toast.makeText(this, "Follow request sent", Toast.LENGTH_SHORT).show()
+
+                // Send notification to recipient
+                sendFollowRequestNotification(toUsername)
             }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "Failed to send request: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
 
+    // Add these functions to your MainActivity class
+
+    // Function to send a new message notification
+    private fun sendNewMessageNotification(recipientUsername: String, message: String, chatId: String) {
+        // Don't send notification to yourself
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername == recipientUsername) return
+
+        // Get the recipient's FCM token
+        val database = FirebaseDatabase.getInstance()
+        val tokensRef = database.getReference("FCMTokens").child(recipientUsername)
+
+        tokensRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (!snapshot.exists()) return
+
+                val recipientToken = snapshot.getValue(String::class.java) ?: return
+
+                // Get sender's name
+                val senderName = sharedPreferences.getString(KEY_NAME, currentUsername) ?: currentUsername
+
+                // Create notification data
+                val notificationData = mapOf(
+                    "type" to "message",
+                    "title" to senderName,
+                    "body" to message,
+                    "senderUsername" to currentUsername,
+                    "chatId" to chatId,
+                    "timestamp" to System.currentTimeMillis().toString()
+                )
+
+                // Send to your notification server
+                sendNotificationToServer(recipientToken, notificationData)
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Notification", "Error getting recipient token: ${error.message}")
+            }
+        })
+    }
+
+    // Function to send a follow request notification
+    private fun sendFollowRequestNotification(recipientUsername: String) {
+        // Don't send notification to yourself
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername == recipientUsername) return
+
+        // Get the recipient's FCM token
+        val database = FirebaseDatabase.getInstance()
+        val tokensRef = database.getReference("FCMTokens").child(recipientUsername)
+
+        tokensRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (!snapshot.exists()) return
+
+                val recipientToken = snapshot.getValue(String::class.java) ?: return
+
+                // Get sender's name
+                val senderName = sharedPreferences.getString(KEY_NAME, currentUsername) ?: currentUsername
+
+                // Create notification data
+                val notificationData = mapOf(
+                    "type" to "follow_request",
+                    "title" to "New Follow Request",
+                    "body" to "$senderName wants to follow you",
+                    "requesterUsername" to currentUsername,
+                    "timestamp" to System.currentTimeMillis().toString()
+                )
+
+                // Send to your notification server
+                sendNotificationToServer(recipientToken, notificationData)
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Notification", "Error getting recipient token: ${error.message}")
+            }
+        })
+    }
+
+    // Function to send a screenshot alert notification
+    private fun sendScreenshotNotification(recipientUsername: String, chatId: String) {
+        // Don't send notification to yourself
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername == recipientUsername) return
+
+        // Get the recipient's FCM token
+        val database = FirebaseDatabase.getInstance()
+        val tokensRef = database.getReference("FCMTokens").child(recipientUsername)
+
+        tokensRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (!snapshot.exists()) return
+
+                val recipientToken = snapshot.getValue(String::class.java) ?: return
+
+                // Get sender's name
+                val senderName = sharedPreferences.getString(KEY_NAME, currentUsername) ?: currentUsername
+
+                // Create notification data
+                val notificationData = mapOf(
+                    "type" to "screenshot",
+                    "title" to "Screenshot Alert",
+                    "body" to "$senderName took a screenshot of your chat",
+                    "username" to currentUsername,
+                    "chatId" to chatId,
+                    "timestamp" to System.currentTimeMillis().toString()
+                )
+
+                // Send to your notification server
+                sendNotificationToServer(recipientToken, notificationData)
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Log.e("Notification", "Error getting recipient token: ${error.message}")
+            }
+        })
+    }
+
+    // Function to send notification to your server
+    // Replace your existing sendNotificationToServer method with this:
+    // Replace your existing sendNotificationToServer method with this:
+    private fun sendNotificationToServer(token: String, data: Map<String, String>) {
+        // Log notification data for debugging
+        Log.d("Notification", "Sending to token: $token")
+        Log.d("Notification", "Notification data: $data")
+
+        // Use the helper class to send the notification
+        NotificationHelper.logNotificationDebug(token, data)
+        NotificationHelper.sendNotification(token, data)
+    }
     // Function to cancel a follow request
     private fun cancelFollowRequest(fromUsername: String, toUsername: String, followButton: Button) {
         if (fromUsername.isEmpty()) return
@@ -3727,6 +4777,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateProfilePicture() {
+        // Get current username
+        val username = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (username.isEmpty()) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Check and request permissions
+        if (checkAndRequestPermissions()) {
+            // Open gallery to select image
+            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+            startActivityForResult(intent, PROFILE_IMAGE_REQUEST)
+        }
+    }
+
+
     // Function to show comment dialog
     private fun showCommentDialog(postId: String, postOwner: String) {
         val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
@@ -4197,29 +5264,60 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Update the onActivityResult method to handle all types of media requests
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (resultCode == Activity.RESULT_OK) {
             when (requestCode) {
                 PROFILE_IMAGE_REQUEST -> {
-                    // Handle profile image selection
                     data?.data?.let { uri ->
-                        val profileImageView = findViewById<ImageView>(R.id.profileImage)
+                        // Show loading indicator
+                        val progressDialog = android.app.ProgressDialog(this).apply {
+                            setMessage("Updating profile picture...")
+                            setCancelable(false)
+                            show()
+                        }
 
-                        // Load the selected image
-                        Glide.with(this)
-                            .load(uri)
-                            .centerCrop()
-                            .into(profileImageView)
+                        try {
+                            // Convert image to base64
+                            val base64Image = uriToBase64(uri)
 
-                        // Reset the alpha to make the image fully visible
-                        profileImageView.alpha = 1.0f
+                            // Get current username
+                            val username = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
 
-                        // Here you would typically upload the image to Firebase Storage
-                        // and update the user's profile with the image URL
-                        // For simplicity, we're just showing it locally for now
-                        Toast.makeText(this, "Profile picture updated", Toast.LENGTH_SHORT).show()
+                            // Update profile image in Firebase
+                            val database = FirebaseDatabase.getInstance()
+                            val userRef = database.getReference("Users").child(username)
+
+                            userRef.child("profilePicUrl").setValue(base64Image)
+                                .addOnSuccessListener {
+                                    progressDialog.dismiss()
+                                    Toast.makeText(this, "Profile picture updated successfully", Toast.LENGTH_SHORT).show()
+
+                                    // Update UI with new profile image
+                                    val profileImageView = findViewById<ImageView>(R.id.profileImage)
+                                    if (profileImageView != null) {
+                                        // Load the image from base64
+                                        try {
+                                            val imageBytes = Base64.decode(base64Image, Base64.DEFAULT)
+                                            val decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                            profileImageView.setImageBitmap(decodedImage)
+                                            profileImageView.alpha = 1.0f
+                                        } catch (e: Exception) {
+                                            Log.e("ProfilePic", "Error decoding image: ${e.message}")
+                                        }
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    progressDialog.dismiss()
+                                    Toast.makeText(this, "Failed to update profile picture: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        } catch (e: Exception) {
+                            progressDialog.dismiss()
+                            Log.e("ProfilePic", "Error: ${e.message}")
+                            Toast.makeText(this, "Error updating profile picture: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
                 PICK_IMAGE_REQUEST -> {
@@ -4273,8 +5371,176 @@ class MainActivity : AppCompatActivity() {
                     // Reload gallery with the new image(s) selected
                     loadGalleryImages()
                 }
-                // Rest of your code...
+                CHAT_IMAGE_GALLERY_REQUEST -> {
+                    data?.data?.let { uri ->
+                        sendMediaMessage(currentChatId, currentRecipientUsername, uri, "image")
+                    }
+                }
+                CHAT_IMAGE_CAMERA_REQUEST -> {
+                    val imageBitmap = data?.extras?.get("data") as? Bitmap
+                    imageBitmap?.let {
+                        // Convert bitmap to URI
+                        val uri = getImageUriFromBitmap(it)
+                        sendMediaMessage(currentChatId, currentRecipientUsername, uri, "image")
+                    }
+                }
+                CHAT_VIDEO_GALLERY_REQUEST -> {
+                    data?.data?.let { uri ->
+                        sendMediaMessage(currentChatId, currentRecipientUsername, uri, "video")
+                    }
+                }
+                CHAT_VIDEO_CAMERA_REQUEST -> {
+                    data?.data?.let { uri ->
+                        sendMediaMessage(currentChatId, currentRecipientUsername, uri, "video")
+                    }
+                }
+                CAMERA_REQUEST -> {
+                    // Handle camera image for posts
+                    val imageBitmap = data?.extras?.get("data") as? Bitmap
+                    imageBitmap?.let {
+                        // Convert bitmap to URI
+                        val uri = getImageUriFromBitmap(it)
+                        selectedImageUri = uri
+
+                        // Add to our list if we're supporting multiple images
+                        if (!selectedImageUris.contains(uri)) {
+                            selectedImageUris.clear() // Clear previous selections for camera capture
+                            selectedImageUris.add(uri)
+                        }
+
+                        // If we're in the post creation screen, update the preview
+                        val selectedImageView = findViewById<ImageView>(R.id.selectedImage)
+                        if (selectedImageView != null) {
+                            Glide.with(this)
+                                .load(uri)
+                                .centerCrop()
+                                .into(selectedImageView)
+                        }
+
+                        // If we're in the story creation screen, proceed to next screen
+                        if (findViewById<TextView>(R.id.btnNext) != null) {
+                            showScreen17()
+                        }
+                    }
+                }
             }
+        }
+    }
+    // Helper method to convert bitmap to URI
+    private fun getImageUriFromBitmap(bitmap: Bitmap): Uri {
+        val bytes = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes)
+        val path = MediaStore.Images.Media.insertImage(contentResolver, bitmap, "Image_${System.currentTimeMillis()}", null)
+        return Uri.parse(path)
+    }
+    private fun sendMediaMessage(chatId: String, recipientUsername: String, mediaUri: Uri, mediaType: String) {
+        // Show loading dialog
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Sending media...")
+            setCancelable(false)
+            show()
+        }
+
+        // Get current username
+        val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
+        if (currentUsername.isEmpty()) {
+            progressDialog.dismiss()
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Get current timestamp
+        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+
+        try {
+            // Convert media to base64
+            val base64Media = uriToBase64(mediaUri, mediaType)
+
+            // Create message data
+            val messageData = mapOf(
+                "sender" to currentUsername,
+                "recipient" to recipientUsername,
+                "timestamp" to timestamp,
+                "mediaType" to mediaType,
+                "media" to base64Media,
+                "read" to false
+            )
+
+            // Get reference to Firebase database
+            val database = FirebaseDatabase.getInstance()
+            val messagesRef = database.getReference("Messages").child(chatId)
+
+            // Generate a unique message ID
+            val messageId = messagesRef.push().key ?: UUID.randomUUID().toString()
+
+            // Save message to Firebase
+            messagesRef.child(messageId).setValue(messageData)
+                .addOnSuccessListener {
+                    progressDialog.dismiss()
+                    Toast.makeText(this, "Media sent", Toast.LENGTH_SHORT).show()
+
+                    // Update last message in Chats
+                    updateLastMessage(chatId, "[${mediaType.capitalize()}]", timestamp)
+
+                    // Refresh the message container to show the new message
+                    val messageContainer = findViewById<LinearLayout>(R.id.messageContainer)
+                    loadMessages(chatId, messageContainer)
+                }
+                .addOnFailureListener { e ->
+                    progressDialog.dismiss()
+                    Toast.makeText(this, "Failed to send media: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            progressDialog.dismiss()
+            Log.e("SendMediaMessage", "Error: ${e.message}")
+            Toast.makeText(this, "Error sending media: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Function to convert media URI to base64
+    private fun uriToBase64(uri: Uri, mediaType: String = "image"): String {
+        return try {
+            val inputStream = contentResolver.openInputStream(uri)
+
+            if (mediaType == "image") {
+                // For images, compress to reduce size
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                val byteArrayOutputStream = ByteArrayOutputStream()
+
+                // Resize image if it's too large
+                val maxDimension = 1024
+                val scaledBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
+                    val scale = maxDimension.toFloat() / Math.max(bitmap.width, bitmap.height)
+                    Bitmap.createScaledBitmap(
+                        bitmap,
+                        (bitmap.width * scale).toInt(),
+                        (bitmap.height * scale).toInt(),
+                        true
+                    )
+                } else {
+                    bitmap
+                }
+
+                // Compress with quality 70% to save bandwidth
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+                val byteArray = byteArrayOutputStream.toByteArray()
+                Base64.encodeToString(byteArray, Base64.DEFAULT)
+            } else {
+                // For videos, we need to be more careful with size
+                // This is a simple implementation - in a real app, you might want to use
+                // a more sophisticated approach or a dedicated file storage service
+                val bytes = inputStream?.readBytes() ?: ByteArray(0)
+
+                // Check if the video is too large (>10MB)
+                if (bytes.size > 10 * 1024 * 1024) {
+                    throw Exception("Video is too large. Please select a smaller video (max 10MB).")
+                }
+
+                Base64.encodeToString(bytes, Base64.DEFAULT)
+            }
+        } catch (e: Exception) {
+            Log.e("UriToBase64", "Error: ${e.message}")
+            throw e
         }
     }
 

@@ -68,7 +68,13 @@ class Screen16Activity : AppCompatActivity() {
         switchCameraButton.setOnClickListener { switchCamera() }
         captureButton.setOnClickListener { captureImage() }
         galleryButton.setOnClickListener { openGallery() }
-        nextButton.setOnClickListener { uploadStory(username) }
+        nextButton.setOnClickListener {
+            if (username != null) {
+                uploadStory(username)
+            } else {
+                Toast.makeText(this, "Username not found", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -143,46 +149,69 @@ class Screen16Activity : AppCompatActivity() {
         galleryLauncher.launch("image/*")
     }
 
-    private fun uploadStory(username : String?)
-    {
-        if (previewImage.drawable == null) {
-            Log.e("Upload", "No image to upload")
-            return
+    private fun uploadStory(username: String) {
+        // Show loading indicator
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Uploading story...")
+            setCancelable(false)
+            show()
         }
 
-        previewImage.isDrawingCacheEnabled = true
-        previewImage.buildDrawingCache()
-        val bitmap = previewImage.drawingCache ?: return
-        val baos = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos)
-        val base64Image = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT)
+        try {
+            if (previewImage.drawable == null) {
+                progressDialog.dismiss()
+                Toast.makeText(this, "No image to upload", Toast.LENGTH_SHORT).show()
+                return
+            }
 
+            previewImage.isDrawingCacheEnabled = true
+            previewImage.buildDrawingCache()
+            val bitmap = previewImage.drawingCache ?: return
+            val baos = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos)
+            val base64Image = Base64.encodeToString(baos.toByteArray(), Base64.DEFAULT)
 
-        if (username == null) {
-            Log.e("Firebase", "User not authenticated")
-            return
+            // Get current timestamp
+            val timestamp = System.currentTimeMillis()
+
+            // Create story data with expiration time
+            // Instead of using .info/ttl (which is invalid), we'll store the expiration time
+            // and handle cleanup separately
+            val storyData = mapOf(
+                "image" to base64Image,
+                "timestamp" to timestamp,
+                "expiresAt" to (timestamp + 86400000) // 24 hours from now
+            )
+
+            // Get reference to Firebase database
+            val database = FirebaseDatabase.getInstance()
+            val storiesRef = database.getReference("stories")
+
+            // Save story to Firebase
+            storiesRef.child(username).setValue(storyData)
+                .addOnSuccessListener {
+                    progressDialog.dismiss()
+                    Toast.makeText(this, "Story uploaded successfully! It will disappear after 24 hours", Toast.LENGTH_SHORT).show()
+
+                    // Return to home screen (Screen 4)
+                    // Create an intent to start MainActivity and tell it to show Screen 4
+                    val intent = Intent(this, MainActivity::class.java)
+                    intent.putExtra("SHOW_SCREEN", 4)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    startActivity(intent)
+                    finish()
+                }
+                .addOnFailureListener { e ->
+                    progressDialog.dismiss()
+                    Log.e("Firebase", "Failed to upload story", e)
+                    Toast.makeText(this, "Failed to upload story: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            progressDialog.dismiss()
+            Log.e("UploadStory", "Error: ${e.message}")
+            Toast.makeText(this, "Error uploading story: ${e.message}", Toast.LENGTH_SHORT).show()
         }
-
-        // Get reference to the story node
-        val storyRef = FirebaseDatabase.getInstance().reference.child("stories").child(username)
-
-        // Set TTL (Time To Live) to 24 hours (86400000 milliseconds)
-        storyRef.child(".info/ttl").setValue(86400000)
-
-        // Upload the story data
-        storyRef.setValue(Story(base64Image, System.currentTimeMillis()))
-            .addOnSuccessListener {
-                Log.d("Firebase", "Story uploaded")
-                Toast.makeText(this, "Story will disappear after 24 hours", Toast.LENGTH_SHORT).show()
-                val intent = Intent(this, MainActivity::class.java)
-                startActivity(intent)
-                finish() // Close this activity
-            }
-            .addOnFailureListener { e ->
-                Log.e("Firebase", "Failed to upload story", e)
-            }
     }
-
 
     data class Story(val image: String, val timestamp: Long)
 
@@ -191,5 +220,3 @@ class Screen16Activity : AppCompatActivity() {
         private const val REQUEST_CODE_PERMISSIONS = 10
     }
 }
-
-

@@ -84,6 +84,7 @@ dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.androidx.ui.text.android)
     implementation(libs.volley)
+    implementation(libs.androidx.tools.core)
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
 
 

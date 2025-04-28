@@ -55,8 +55,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
+import androidx.privacysandbox.tools.core.model.Method
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import com.android.volley.Request
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -172,86 +174,83 @@ class MainActivity : AppCompatActivity() {
     // Add this function to your MainActivity class
     private fun setupPresenceSystem() {
         val username = sharedPreferences.getString(KEY_USERNAME, "") ?: return
-
-        val database = FirebaseDatabase.getInstance()
-        val connectedRef = database.getReference(".info/connected")
-        val presenceRef = database.getReference(PRESENCE_REF).child(username)
-        val userStatusRef = database.getReference(ONLINE_STATUS_REF).child(username)
-
-        connectedRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-
-                if (connected) {
-                    // User is connected, add presence entry
-                    presenceRef.setValue(true)
-
-                    // Remove presence when user disconnects
-                    presenceRef.onDisconnect().removeValue()
-
-                    // Update online status
-                    updateOnlineStatus(true)
-
-                    // Set offline status when user disconnects
-                    val offlineStatus = mapOf(
-                        "online" to false,
-                        "lastSeen" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                    )
-                    userStatusRef.onDisconnect().setValue(offlineStatus)
-                }
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                Log.e("Presence", "Error setting up presence: ${error.message}")
-            }
-        })
+        updateOnlineStatus(true)
     }
-
-    // Add this function to update online status
     private fun updateOnlineStatus(isOnline: Boolean) {
         val username = sharedPreferences.getString(KEY_USERNAME, "") ?: return
 
-        // Get reference to Firebase database
-        val database = FirebaseDatabase.getInstance()
-        val userStatusRef = database.getReference(ONLINE_STATUS_REF).child(username)
+        // Create JSON payload
+        val jsonPayload = JSONObject().apply {
+            put("username", username)
+            put("online", isOnline)
+        }
 
-        // Create status data
-        val statusData = mapOf(
-            "online" to isOnline,
-            "lastSeen" to SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        )
+        // Make API request to update status
+        val url = "http://$SERVER_IP/connectme/user_status.php"
 
-        // Update status in Firebase
-        userStatusRef.setValue(statusData)
-            .addOnFailureListener { e ->
-                Log.e("OnlineStatus", "Error updating online status: ${e.message}")
+        val stringRequest = object : StringRequest(
+            Request.Method.POST, url,
+            { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    val success = jsonResponse.getBoolean("success")
+
+                    if (!success) {
+                        val message = jsonResponse.getString("message")
+                        Log.e("OnlineStatus", "Error updating online status: $message")
+                    }
+                } catch (e: Exception) {
+                    Log.e("OnlineStatus", "Error parsing response: ${e.message}")
+                }
+            },
+            { error ->
+                Log.e("OnlineStatus", "Error updating online status: ${error.message}")
             }
+        ) {
+            override fun getBody(): ByteArray {
+                return jsonPayload.toString().toByteArray()
+            }
+
+            override fun getHeaders(): Map<String, String> {
+                return mapOf("Content-Type" to "application/json")
+            }
+        }
+
+        Volley.newRequestQueue(this).add(stringRequest)
     }
 
-    // Add this function to check another user's online status
     private fun checkUserOnlineStatus(username: String, callback: (isOnline: Boolean, lastSeen: String) -> Unit) {
-        val database = FirebaseDatabase.getInstance()
-        val userStatusRef = database.getReference(ONLINE_STATUS_REF).child(username)
+        // Make API request to get user status
+        val url = "http://$SERVER_IP/connectme/user_status.php?username=$username"
 
-        userStatusRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (snapshot.exists()) {
-                    val online = snapshot.child("online").getValue(Boolean::class.java) ?: false
-                    val lastSeen = snapshot.child("lastSeen").getValue(String::class.java) ?: ""
-                    callback(online, lastSeen)
-                } else {
+        val stringRequest = StringRequest(
+            Request.Method.GET, url,
+            { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    val success = jsonResponse.getBoolean("success")
+
+                    if (success) {
+                        val isOnline = jsonResponse.getBoolean("online")
+                        val lastSeen = jsonResponse.getString("last_seen")
+                        callback(isOnline, lastSeen)
+                    } else {
+                        callback(false, "")
+                    }
+                } catch (e: Exception) {
+                    Log.e("OnlineStatus", "Error parsing response: ${e.message}")
                     callback(false, "")
                 }
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+            },
+            { error ->
                 Log.e("OnlineStatus", "Error checking online status: ${error.message}")
                 callback(false, "")
             }
-        })
+        )
+
+        Volley.newRequestQueue(this).add(stringRequest)
     }
 
-    // Add this helper function to format last seen time
     private fun formatLastSeen(timestamp: String): String {
         if (timestamp.isEmpty()) return "recently"
 
@@ -274,7 +273,6 @@ class MainActivity : AppCompatActivity() {
             return "recently"
         }
     }
-
     private fun handleNotificationIntent(intent: Intent?) {
         if (intent?.extras != null) {
             // Check if opened from a chat notification

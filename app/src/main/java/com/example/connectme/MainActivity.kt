@@ -1707,48 +1707,69 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Get reference to Firebase database
-        val database = FirebaseDatabase.getInstance()
-        val requestsRef = database.getReference("FollowRequests").child(currentUsername)
+        // Get follow requests from PHP backend
+        val url = "http://$SERVER_IP/connectme/follow_requests.php?username=$currentUsername"
 
-        // Query for follow requests
-        requestsRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+        val request = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
                 // Clear the container
                 container.removeAllViews()
 
-                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
-                    // No requests found
-                    val noRequestsText = TextView(this@MainActivity).apply {
-                        text = "No follow requests"
+                try {
+                    val success = response.getBoolean("success")
+                    if (success) {
+                        val requests = response.getJSONArray("requests")
+
+                        // If no requests, show message
+                        if (requests.length() == 0) {
+                            val noRequestsText = TextView(this).apply {
+                                text = "No follow requests"
+                                textSize = 16f
+                                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                                setTextColor(android.graphics.Color.GRAY)
+                            }
+                            container.addView(noRequestsText)
+                            return@JsonObjectRequest
+                        }
+
+                        // Process each request
+                        for (i in 0 until requests.length()) {
+                            val request = requests.getJSONObject(i)
+                            val fromUsername = request.getString("username")
+                            val name = request.getString("name")
+                            val profilePicUrl = request.getString("profile_pic_url")
+
+                            // Create request item view
+                            val requestView = createRequestItemView(fromUsername, name, profilePicUrl, container)
+                            container.addView(requestView)
+                        }
+                    } else {
+                        val errorText = TextView(this).apply {
+                            text = "Error loading requests: ${response.optString("message", "Unknown error")}"
+                            textSize = 16f
+                            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                            setTextColor(android.graphics.Color.RED)
+                        }
+                        container.addView(errorText)
+                    }
+                } catch (e: Exception) {
+                    Log.e("LoadRequests", "Error parsing requests: ${e.message}")
+                    val errorText = TextView(this).apply {
+                        text = "Error loading requests: ${e.message}"
                         textSize = 16f
                         setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
-                        setTextColor(android.graphics.Color.GRAY)
+                        setTextColor(android.graphics.Color.RED)
                     }
-                    container.addView(noRequestsText)
-                    return
+                    container.addView(errorText)
                 }
-
-                // Process each request
-                for (requestSnapshot in snapshot.children) {
-                    val fromUsername = requestSnapshot.key ?: continue
-                    val timestamp = requestSnapshot.child("timestamp").value as? String ?: ""
-
-                    // Get user info for the requester
-                    getUserInfo(fromUsername) { name, profilePicUrl ->
-                        // Create request item view
-                        val requestView = createRequestItemView(fromUsername, name, profilePicUrl, container)
-                        container.addView(requestView)
-                    }
-                }
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                Log.e("FollowRequests", "Error loading requests: ${error.message}")
-
-                // Show error message
+            },
+            { error ->
+                // Clear the container
                 container.removeAllViews()
-                val errorText = TextView(this@MainActivity).apply {
+
+                Log.e("LoadRequests", "Error loading requests: ${error.message}")
+                val errorText = TextView(this).apply {
                     text = "Error loading requests: ${error.message}"
                     textSize = 16f
                     setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
@@ -1756,9 +1777,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 container.addView(errorText)
             }
-        })
-    }
+        )
 
+        Volley.newRequestQueue(this).add(request)
+    }
 
     // Function to create a request item view
     private fun createRequestItemView(username: String, name: String, profilePicUrl: String, container: LinearLayout): View {
@@ -1862,44 +1884,47 @@ class MainActivity : AppCompatActivity() {
         return itemLayout
     }
 
-
     // Function to accept a follow request
     private fun acceptFollowRequest(fromUsername: String, container: LinearLayout) {
         val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
         if (currentUsername.isEmpty()) return
 
-        val database = FirebaseDatabase.getInstance()
-        val requestsRef = database.getReference("FollowRequests")
-        val followersRef = database.getReference("Followers")
-        val followingRef = database.getReference("Following")
-
         // Show loading toast
         Toast.makeText(this, "Accepting request...", Toast.LENGTH_SHORT).show()
 
-        // Add to followers list (fromUsername is now following currentUsername)
-        followersRef.child(currentUsername).child(fromUsername).setValue(true)
-            .addOnSuccessListener {
-                // Add to following list (currentUsername is now followed by fromUsername)
-                followingRef.child(fromUsername).child(currentUsername).setValue(true)
-                    .addOnSuccessListener {
-                        // Remove the request
-                        requestsRef.child(currentUsername).child(fromUsername).removeValue()
-                            .addOnSuccessListener {
-                                Toast.makeText(this, "Follow request accepted", Toast.LENGTH_SHORT).show()
-                                // Reload the requests
-                                loadFollowRequests(container)
-                            }
-                            .addOnFailureListener { e ->
-                                Toast.makeText(this, "Error removing request: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
+        val url = "http://$SERVER_IP/connectme/follow_requests.php"
+
+        val params = HashMap<String, String>()
+        params["from_user"] = fromUsername
+        params["to_user"] = currentUsername
+
+        val request = object : StringRequest(
+            Request.Method.PUT, url,
+            Response.Listener { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    val success = jsonResponse.getBoolean("success")
+                    if (success) {
+                        Toast.makeText(this, "Follow request accepted", Toast.LENGTH_SHORT).show()
+                        // Reload the requests
+                        loadFollowRequests(container)
+                    } else {
+                        Toast.makeText(this, "Error accepting request: ${jsonResponse.getString("message")}", Toast.LENGTH_SHORT).show()
                     }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(this, "Error updating following: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Error parsing response: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            Response.ErrorListener { error ->
+                Toast.makeText(this, "Error accepting request: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Error updating followers: ${e.message}", Toast.LENGTH_SHORT).show()
+        ) {
+            override fun getParams(): Map<String, String> {
+                return params
             }
+        }
+
+        Volley.newRequestQueue(this).add(request)
     }
 
     // Function to reject a follow request
@@ -1907,22 +1932,36 @@ class MainActivity : AppCompatActivity() {
         val currentUsername = sharedPreferences.getString(KEY_USERNAME, "") ?: ""
         if (currentUsername.isEmpty()) return
 
-        val database = FirebaseDatabase.getInstance()
-        val requestsRef = database.getReference("FollowRequests")
-
         // Show loading toast
         Toast.makeText(this, "Rejecting request...", Toast.LENGTH_SHORT).show()
 
-        // Remove the request
-        requestsRef.child(currentUsername).child(fromUsername).removeValue()
-            .addOnSuccessListener {
-                Toast.makeText(this, "Follow request rejected", Toast.LENGTH_SHORT).show()
-                // Reload the requests
-                loadFollowRequests(container)
+        val url = "http://$SERVER_IP/connectme/follow_requests.php?from_user=$fromUsername&to_user=$currentUsername"
+
+        val request = object : StringRequest(
+            Request.Method.DELETE, url,
+            Response.Listener { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    val success = jsonResponse.getBoolean("success")
+                    if (success) {
+                        Toast.makeText(this, "Follow request rejected", Toast.LENGTH_SHORT).show()
+                        // Reload the requests
+                        loadFollowRequests(container)
+                    } else {
+                        Toast.makeText(this, "Error rejecting request: ${jsonResponse.getString("message")}", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Error parsing response: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            Response.ErrorListener { error ->
+                Toast.makeText(this, "Error rejecting request: ${error.message}", Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Error rejecting request: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        ) {
+            // No need to override getParams() for DELETE request
+        }
+
+        Volley.newRequestQueue(this).add(request)
     }
 
     // Function to filter requests by search query
@@ -1965,37 +2004,48 @@ class MainActivity : AppCompatActivity() {
             container.addView(noResultsText)
         }
     }
-    // Function to get user info from Firebase
-    private fun getUserInfo(username: String, callback: (name: String, profilePicUrl: String) -> Unit) {
-        val database = FirebaseDatabase.getInstance()
-        val usersRef = database.getReference("Users").child(username)
 
-        usersRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (snapshot.exists()) {
-                    val name = snapshot.child("name").value as? String ?: username
-                    val profilePicUrl = snapshot.child("profilePicUrl").value as? String ?: ""
-                    callback(name, profilePicUrl)
-                } else {
+    // Function to get user info
+    private fun getUserInfo(username: String, callback: (name: String, profilePicUrl: String) -> Unit) {
+        val url = "http://$SERVER_IP/connectme/users.php?username=$username"
+
+        val request = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
+                try {
+                    val success = response.getBoolean("success")
+                    if (success) {
+                        val user = response.getJSONObject("user")
+                        val name = user.getString("name")
+                        val profilePicUrl = user.optString("profile_pic_url", "")
+                        callback(name, profilePicUrl)
+                    } else {
+                        callback(username, "")
+                    }
+                } catch (e: Exception) {
+                    Log.e("UserInfo", "Error parsing user info: ${e.message}")
                     callback(username, "")
                 }
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+            },
+            { error ->
                 Log.e("UserInfo", "Error getting user info: ${error.message}")
                 callback(username, "")
             }
-        })
-    }
+        )
 
+        Volley.newRequestQueue(this).add(request)
+    }
+    private var currentChatId = ""
+    private var currentRecipientUsername = ""
 
     private fun showScreen6(chatId: String, username: String, name: String, profilePicUrl: String) {
         setContentView(R.layout.screen6)
         currentChatId = chatId
+        currentRecipientUsername = username
+
         // Set user name in the header
         val userNameTextView = findViewById<TextView>(R.id.userName)
         userNameTextView.text = name
-
 
         // Create online status text view
         val onlineStatusView = TextView(this).apply {
@@ -2060,7 +2110,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-
         // Set profile image
         val profileImageView = findViewById<ImageView>(R.id.profileImage)
         if (profilePicUrl.isNotEmpty()) {
@@ -2083,6 +2132,7 @@ class MainActivity : AppCompatActivity() {
                 view.onApplyWindowInsets(insets)
             }
         }
+
         // Set up back button
         val backButton = findViewById<ImageView>(R.id.BackButton)
         backButton.setOnClickListener {
@@ -2105,11 +2155,11 @@ class MainActivity : AppCompatActivity() {
         viewProfileButton.setOnClickListener {
             viewUserProfile(username)
         }
+
         val attachmentButton = findViewById<ImageView>(R.id.attachmentButton)
         attachmentButton.setOnClickListener {
             showMediaSelectionDialog(chatId, username)
         }
-
 
         // Get message container
         val messageContainer = findViewById<LinearLayout>(R.id.messageContainer)

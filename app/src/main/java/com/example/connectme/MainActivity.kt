@@ -55,7 +55,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
-
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 class MainActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private var selectedImageUri: android.net.Uri? = null
@@ -68,6 +75,7 @@ class MainActivity : AppCompatActivity() {
 
 
     companion object {
+        const val SERVER_IP = "192.168.18.18"
         private const val PREF_NAME = "ConnectMePrefs"
         private const val KEY_IS_LOGGED_IN = "isLoggedIn"
         private const val KEY_USERNAME = "username"
@@ -439,38 +447,73 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private fun loginUser(username: String, password: String) {
-        val database = FirebaseDatabase.getInstance()
-        val usersRef = database.getReference("Users")
-
-        usersRef.child(username).get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val dbPassword = snapshot.child("password").value.toString()
-                if (dbPassword == password) {
-                    // Get user data from database
-                    val name = snapshot.child("name").value.toString()
-                    val email = snapshot.child("email").value.toString()
-                    val phone = snapshot.child("phone").value.toString()
-
-                    // Save credentials to SharedPreferences
-                    saveUserCredentials(username, name, email, phone)
-
-                    setupPresenceSystem()
-
-                    // Update online status
-                    updateOnlineStatus(true)
-
-                    registerFCMToken();
-                    Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
-                    showScreen4() // Navigate to home screen
-                } else {
-                    Toast.makeText(this, "Incorrect password", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(this, "Username not found", Toast.LENGTH_SHORT).show()
-            }
-        }.addOnFailureListener {
-            Toast.makeText(this, "Login failed: ${it.message}", Toast.LENGTH_SHORT).show()
+        val progressDialog = android.app.ProgressDialog(this).apply {
+            setMessage("Logging in...")
+            setCancelable(false)
+            show()
         }
+
+        Thread {
+            try {
+                // Correct URL
+                val url = URL("http://$SERVER_IP/connectme/login.php")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+
+                // Create JSON payload
+                val jsonPayload = JSONObject().apply {
+                    put("username", username)
+                    put("password", password)
+                }
+
+                // Send request
+                connection.outputStream.use { outputStream ->
+                    OutputStreamWriter(outputStream, "UTF-8").use { writer ->
+                        writer.write(jsonPayload.toString())
+                    }
+                }
+
+                val responseCode = connection.responseCode
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+
+                    val jsonResponse = JSONObject(response)
+                    val success = jsonResponse.getBoolean("success")
+
+                    runOnUiThread {
+                        progressDialog.dismiss()
+
+                        if (success) {
+                            val userData = jsonResponse.getJSONObject("user")
+                            val name = userData.getString("name")
+                            val email = userData.getString("email")
+                            val phone = userData.getString("phone")
+
+                            saveUserCredentials(username, name, email, phone)
+
+                            Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
+                            showScreen4()
+                        } else {
+                            val message = jsonResponse.getString("message")
+                            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        Toast.makeText(this, "Login failed: Server error", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    Toast.makeText(this, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
     private fun showScreen3() {
@@ -498,36 +541,49 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
             return
         }
+        val url = "http://$SERVER_IP/connectme/registration.php"
 
-        val database = FirebaseDatabase.getInstance()
-        val usersRef = database.getReference("Users")
+        val stringRequest = object : StringRequest(
+            Method.POST, url,
+            { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    val status = jsonResponse.getInt("status")
+                    val message = jsonResponse.getString("message")
 
-        // Check if username already exists
-        usersRef.child(username).get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                Toast.makeText(this, "Username already exists", Toast.LENGTH_SHORT).show()
-            } else {
-                // Save user data
-                val userMap = mapOf(
-                    "name" to name,
-                    "username" to username,
-                    "phone" to phone,
-                    "email" to email,
-                    "password" to password // In production, hash the password!
-                )
-                usersRef.child(username).setValue(userMap)
-                    .addOnSuccessListener {
+                    if (status == 1) {
                         // Save credentials to SharedPreferences
                         saveUserCredentials(username, name, email, phone)
 
                         Toast.makeText(this, "Signup successful", Toast.LENGTH_SHORT).show()
-                        showScreen4() // Take them directly to home screen after registration
+                        showScreen4() // Navigate to Home Screen
+                    } else {
+                        Toast.makeText(this, "Signup failed: $message", Toast.LENGTH_SHORT).show()
                     }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(this, "Signup failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Error parsing server response: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            { error ->
+                Toast.makeText(this, "Network error: ${error.message ?: "Unknown error"}", Toast.LENGTH_SHORT).show()
+            }
+        ) {
+            override fun getParams(): Map<String, String> {
+                return mapOf(
+                    "username" to username,
+                    "password" to password,
+                    "name" to name,
+                    "email" to email,
+                    "phone" to phone,
+                    "bio" to "Sent from Android", // default bio text
+                    "profile_pic_url" to "",
+                    "cover_pic_url" to ""
+                )
             }
         }
+
+        val queue = Volley.newRequestQueue(this)
+        queue.add(stringRequest)
     }
 
     private fun logout() {

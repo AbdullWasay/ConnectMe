@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.androidx.ui.text.android)
+    implementation(libs.volley)
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
 
 

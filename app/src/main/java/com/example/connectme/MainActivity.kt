@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.animation.ObjectAnimator
 import android.app.Activity
 import android.content.ContentUris
+
+import com.android.volley.toolbox.JsonObjectRequest
 import android.content.Context
 import android.util.Log
 // Add these imports at the top of your file
@@ -48,6 +50,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import java.io.File
+import com.android.volley.Response
 import java.io.FileOutputStream
 import com.google.firebase.messaging.FirebaseMessaging
 import android.Manifest
@@ -297,12 +300,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleNotificationIntent(intent)
     }
-
     private fun registerForPushNotifications() {
         // Request notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -316,22 +317,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Get FCM token
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w("FCM", "Fetching FCM registration token failed", task.exception)
-                return@addOnCompleteListener
-            }
-
-            // Get new FCM registration token
-            val token = task.result
-
-            // Log and save the token
-            Log.d("FCM", "FCM Token: $token")
-            saveFCMToken(token)
-        }
+        // For a real app, you would get the FCM token here
+        // For this example, we'll use a dummy token
+        val token = "dummy_fcm_token_${System.currentTimeMillis()}"
+        Log.d("FCM", "FCM Token: $token")
+        saveFCMToken(token)
     }
-
     private fun saveUserCredentials(username: String, name: String, email: String, phone: String, bio: String = "") {
         val editor = sharedPreferences.edit()
         editor.putBoolean(KEY_IS_LOGGED_IN, true)
@@ -370,43 +361,46 @@ class MainActivity : AppCompatActivity() {
 
     // Function to create or get a chat ID between two users
     private fun createOrGetChatId(user1: String, user2: String, callback: (String) -> Unit) {
-        // Sort usernames to ensure consistent chat ID regardless of who initiates
+        // Sort usernames to ensure consistent chat ID
         val sortedUsers = listOf(user1, user2).sorted()
         val chatId = "${sortedUsers[0]}_${sortedUsers[1]}"
 
-        // Check if chat exists in Firebase
-        val database = FirebaseDatabase.getInstance()
-        val chatsRef = database.getReference("Chats")
+        val url = "http://$SERVER_IP/connectme/chats.php"
 
-        chatsRef.child(chatId).get().addOnSuccessListener { snapshot ->
-            if (!snapshot.exists()) {
-                // Create new chat entry
-                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                val chatData = mapOf(
-                    "participants" to sortedUsers,
-                    "created_at" to timestamp,
-                    "last_message" to "",
-                    "last_message_time" to timestamp
-                )
+        val params = HashMap<String, String>()
+        params["participant1"] = sortedUsers[0]
+        params["participant2"] = sortedUsers[1]
 
-                chatsRef.child(chatId).setValue(chatData)
-                    .addOnSuccessListener {
-                        callback(chatId)
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("CreateChat", "Error creating chat: ${e.message}")
+        val request = object : StringRequest(
+            Request.Method.POST, url,
+            Response.Listener { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    val success = jsonResponse.getBoolean("success")
+                    if (success) {
+                        val returnedChatId = jsonResponse.getString("chat_id")
+                        callback(returnedChatId)
+                    } else {
+                        Log.e("CreateChat", "Error creating chat: ${jsonResponse.getString("message")}")
                         callback(chatId) // Still proceed with the chat ID
                     }
-            } else {
-                // Chat already exists
-                callback(chatId)
+                } catch (e: Exception) {
+                    Log.e("CreateChat", "Error parsing response: ${e.message}")
+                    callback(chatId) // Still proceed with the chat ID
+                }
+            },
+            Response.ErrorListener { error ->
+                Log.e("CreateChat", "Error creating chat: ${error.message}")
+                callback(chatId) // Still proceed with the chat ID
             }
-        }.addOnFailureListener { e ->
-            Log.e("CreateChat", "Error checking chat: ${e.message}")
-            callback(chatId) // Still proceed with the chat ID
+        ) {
+            override fun getParams(): Map<String, String> {
+                return params
+            }
         }
-    }
 
+        Volley.newRequestQueue(this).add(request)
+    }
 
     private fun showScreen2() {
         setContentView(R.layout.screen2)
@@ -710,36 +704,43 @@ class MainActivity : AppCompatActivity() {
 
         // Clear existing stories except the first one (which is the user's own story)
         if (storiesContainer.childCount > 1) {
-            storiesContainer.removeViews(1, storiesContainer.childCount - 1)
+            storiesContainer.removeAllViews()
         }
 
-        // Get reference to Firebase database
-        val database = FirebaseDatabase.getInstance()
-        val followingRef = database.getReference("Following").child(currentUsername)
+        // Get stories from users that the current user follows
+        val url = "http://$SERVER_IP/connectme/stories.php?following=$currentUsername"
 
-        // Get list of users that the current user follows
-        followingRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
-                    // Not following anyone, no stories to show
-                    return
+        val request = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
+                try {
+                    val success = response.getBoolean("success")
+                    if (success) {
+                        val stories = response.getJSONArray("stories")
+
+                        // Process each story
+                        for (i in 0 until stories.length()) {
+                            val story = stories.getJSONObject(i)
+                            val username = story.getString("username")
+                            val name = story.getString("name")
+                            val profilePicUrl = story.getString("profile_pic_url")
+                            val storyImage = story.getString("image")
+
+                            // Create story view
+                            val storyView = createStoryView(username, name, profilePicUrl, storyImage)
+                            storiesContainer.addView(storyView)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("Stories", "Error parsing stories: ${e.message}")
                 }
-
-                // Get list of followed usernames
-                val followedUsers = ArrayList<String>()
-                for (userSnapshot in snapshot.children) {
-                    val username = userSnapshot.key ?: continue
-                    followedUsers.add(username)
-                }
-
-                // Now fetch stories from these users
-                fetchStoriesFromUsers(followedUsers, storiesContainer)
+            },
+            { error ->
+                Log.e("Stories", "Error loading stories: ${error.message}")
             }
+        )
 
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                Log.e("LoadFollowingStories", "Error loading following: ${error.message}")
-            }
-        })
+        Volley.newRequestQueue(this).add(request)
     }
 
     // Function to fetch stories from followed users
@@ -830,8 +831,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
     }
-
-    // Function to create a story view
     private fun createStoryView(username: String, name: String, profilePicUrl: String, storyImage: String?): View {
         // Create story image view
         val storyImageView = ImageView(this).apply {
@@ -862,7 +861,6 @@ class MainActivity : AppCompatActivity() {
         return storyImageView
     }
 
-    // Function to view a story
     private fun viewStory(username: String, name: String, storyImage: String?) {
         if (storyImage.isNullOrEmpty()) {
             Toast.makeText(this, "Story not available", Toast.LENGTH_SHORT).show()
@@ -907,8 +905,6 @@ class MainActivity : AppCompatActivity() {
         }, 5000) // 5 seconds
     }
 
-
-
     // Function to load posts from users that the current user follows
     private fun loadFollowingPosts(currentUsername: String) {
         // Get reference to the posts container
@@ -926,49 +922,80 @@ class MainActivity : AppCompatActivity() {
         }
         postsContainer.addView(loadingText)
 
-        // Get reference to Firebase database
-        val database = FirebaseDatabase.getInstance()
-        val followingRef = database.getReference("Following").child(currentUsername)
+        // Get posts from users that the current user follows
+        val url = "http://$SERVER_IP/connectme/posts.php?feed=$currentUsername"
 
-        // Get list of users that the current user follows
-        followingRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
-                    // Not following anyone
-                    postsContainer.removeAllViews()
-                    val noFollowingText = TextView(this@MainActivity).apply {
-                        text = "You're not following anyone yet. Follow some users to see their posts here!"
+        val request = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
+                // Remove loading indicator
+                postsContainer.removeAllViews()
+
+                try {
+                    val success = response.getBoolean("success")
+                    if (success) {
+                        val posts = response.getJSONArray("posts")
+
+                        // If no posts, show message
+                        if (posts.length() == 0) {
+                            val noPostsText = TextView(this).apply {
+                                text = "No posts to show. Follow users or create your own posts!"
+                                textSize = 16f
+                                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                                gravity = Gravity.CENTER
+                                setTextColor(android.graphics.Color.GRAY)
+                            }
+                            postsContainer.addView(noPostsText)
+                            return@JsonObjectRequest
+                        }
+
+                        // Process each post
+                        for (i in 0 until posts.length()) {
+                            val post = posts.getJSONObject(i)
+                            val postId = post.getString("post_id")
+                            val username = post.getString("username")
+                            val name = post.getString("name")
+                            val profilePicUrl = post.getString("profile_pic_url")
+                            val caption = post.getString("caption")
+                            val timestamp = post.getString("timestamp")
+
+                            // Get images
+                            val imagesArray = post.getJSONArray("images")
+                            val imagesList = ArrayList<String>()
+                            for (j in 0 until imagesArray.length()) {
+                                imagesList.add(imagesArray.getString(j))
+                            }
+
+                            // Create post view
+                            val postView = createPostView(postId, username, name, profilePicUrl, imagesList, caption, timestamp)
+                            postsContainer.addView(postView)
+                        }
+                    } else {
+                        val errorText = TextView(this).apply {
+                            text = "Error loading posts: ${response.optString("message", "Unknown error")}"
+                            textSize = 16f
+                            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                            setTextColor(android.graphics.Color.RED)
+                        }
+                        postsContainer.addView(errorText)
+                    }
+                } catch (e: Exception) {
+                    Log.e("LoadPosts", "Error parsing posts: ${e.message}")
+                    val errorText = TextView(this).apply {
+                        text = "Error loading posts: ${e.message}"
                         textSize = 16f
                         setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
-                        gravity = Gravity.CENTER
-                        setTextColor(android.graphics.Color.GRAY)
+                        setTextColor(android.graphics.Color.RED)
                     }
-                    postsContainer.addView(noFollowingText)
-                    return
+                    postsContainer.addView(errorText)
                 }
-
-                // Get list of followed usernames
-                val followedUsers = ArrayList<String>()
-                for (userSnapshot in snapshot.children) {
-                    val username = userSnapshot.key ?: continue
-                    followedUsers.add(username)
-                }
-
-                // Add current user to see their own posts too
-                if (!followedUsers.contains(currentUsername)) {
-                    followedUsers.add(currentUsername)
-                }
-
-                // Now fetch posts from these users
-                fetchPostsFromUsers(followedUsers, postsContainer)
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                Log.e("LoadFollowingPosts", "Error loading following: ${error.message}")
-
-                // Show error message
+            },
+            { error ->
+                // Remove loading indicator
                 postsContainer.removeAllViews()
-                val errorText = TextView(this@MainActivity).apply {
+
+                Log.e("LoadPosts", "Error loading posts: ${error.message}")
+                val errorText = TextView(this).apply {
                     text = "Error loading posts: ${error.message}"
                     textSize = 16f
                     setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
@@ -976,7 +1003,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 postsContainer.addView(errorText)
             }
-        })
+        )
+
+        Volley.newRequestQueue(this).add(request)
     }
 
     // Function to fetch posts from a list of users
@@ -1066,7 +1095,8 @@ class MainActivity : AppCompatActivity() {
             val caption = post["caption"] as? String ?: ""
             val timestamp = post["timestamp"] as? String ?: ""
             val postId = post["postId"] as? String ?: ""
-            val imagesList = post["images"] as? ArrayList<*> ?: continue
+            val imagesList = (post["images"] as? ArrayList<*>)?.filterIsInstance<String>() as ArrayList<String>
+
 
             // Get user info for the post author
             getUserInfo(username) { name, profilePicUrl ->
@@ -1077,9 +1107,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Function to create a post view
     private fun createPostView(postId: String, username: String, name: String, profilePicUrl: String,
-                               imagesList: ArrayList<*>, caption: String, timestamp: String): View {
+                               imagesList: ArrayList<String>, caption: String, timestamp: String): View {
         // Create the post layout
         val postLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1159,7 +1188,7 @@ class MainActivity : AppCompatActivity() {
 
         // Create post image view
         if (imagesList.isNotEmpty()) {
-            val base64Image = imagesList[0] as? String ?: ""
+            val base64Image = imagesList[0]
             if (base64Image.isNotEmpty()) {
                 try {
                     // Convert base64 to bitmap
@@ -1372,81 +1401,71 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(loadingText)
 
-        // Get reference to Firebase database
-        val database = FirebaseDatabase.getInstance()
-        val chatsRef = database.getReference("Chats")
+        // Get chats from PHP backend
+        val url = "http://$SERVER_IP/connectme/chats.php?username=$username"
 
-        // Query for chats where this user is a participant
-        chatsRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+        val request = JsonObjectRequest(
+            Request.Method.GET, url, null,
+            { response ->
                 // Clear the container
                 container.removeAllViews()
 
-                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
-                    // No chats found
-                    val noChatsText = TextView(this@MainActivity).apply {
-                        text = "No chats yet. Start a conversation with someone!"
+                try {
+                    val success = response.getBoolean("success")
+                    if (success) {
+                        val chats = response.getJSONArray("chats")
+
+                        // If no chats, show message
+                        if (chats.length() == 0) {
+                            val noChatsText = TextView(this).apply {
+                                text = "No chats yet. Start a conversation with someone!"
+                                textSize = 16f
+                                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                                setTextColor(android.graphics.Color.GRAY)
+                            }
+                            container.addView(noChatsText)
+                            return@JsonObjectRequest
+                        }
+
+                        // Process each chat
+                        for (i in 0 until chats.length()) {
+                            val chat = chats.getJSONObject(i)
+                            val chatId = chat.getString("chat_id")
+                            val otherUsername = chat.getString("other_participant")
+                            val otherName = chat.getString("other_name")
+                            val otherProfilePic = chat.getString("other_profile_pic")
+                            val lastMessage = chat.optString("last_message", "")
+
+                            // Create chat item view
+                            val chatView = createChatItemView(chatId, otherUsername, otherName, otherProfilePic, lastMessage)
+                            container.addView(chatView)
+                        }
+                    } else {
+                        val errorText = TextView(this).apply {
+                            text = "Error loading chats: ${response.optString("message", "Unknown error")}"
+                            textSize = 16f
+                            setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+                            setTextColor(android.graphics.Color.RED)
+                        }
+                        container.addView(errorText)
+                    }
+                } catch (e: Exception) {
+                    Log.e("LoadChats", "Error parsing chats: ${e.message}")
+                    val errorText = TextView(this).apply {
+                        text = "Error loading chats: ${e.message}"
                         textSize = 16f
                         setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
-                        setTextColor(android.graphics.Color.GRAY)
+                        setTextColor(android.graphics.Color.RED)
                     }
-                    container.addView(noChatsText)
-                    return
+                    container.addView(errorText)
                 }
-
-                // Process each chat
-                val chatsList = ArrayList<Map<String, Any>>()
-
-                for (chatSnapshot in snapshot.children) {
-                    val chatId = chatSnapshot.key ?: continue
-                    val chatData = chatSnapshot.value as? Map<*, *> ?: continue
-
-                    // Get participants
-                    val participants = chatData["participants"] as? List<*> ?: continue
-                    if (!participants.contains(username)) continue
-
-                    // Find the other participant (not the current user)
-                    val otherUser = participants.find { it != username } as? String ?: continue
-
-                    // Get last message and time
-                    val lastMessage = chatData["last_message"] as? String ?: ""
-                    val lastMessageTime = chatData["last_message_time"] as? String ?: ""
-
-                    // Create a map with chat info
-                    val chatInfo = mapOf(
-                        "chatId" to chatId,
-                        "otherUser" to otherUser,
-                        "lastMessage" to lastMessage,
-                        "lastMessageTime" to lastMessageTime
-                    )
-
-                    chatsList.add(chatInfo)
-                }
-
-                // Sort chats by last message time (most recent first)
-                chatsList.sortByDescending { it["lastMessageTime"] as String }
-
-                // Display each chat
-                for (chatInfo in chatsList) {
-                    val otherUsername = chatInfo["otherUser"] as String
-                    val chatId = chatInfo["chatId"] as String
-                    val lastMessage = chatInfo["lastMessage"] as String
-
-                    // Get user info for the other participant
-                    getUserInfo(otherUsername) { name, profilePicUrl ->
-                        // Create chat item view
-                        val chatView = createChatItemView(chatId, otherUsername, name, profilePicUrl, lastMessage)
-                        container.addView(chatView)
-                    }
-                }
-            }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                Log.e("Chats", "Error loading chats: ${error.message}")
-
-                // Show error message
+            },
+            { error ->
+                // Clear the container
                 container.removeAllViews()
-                val errorText = TextView(this@MainActivity).apply {
+
+                Log.e("LoadChats", "Error loading chats: ${error.message}")
+                val errorText = TextView(this).apply {
                     text = "Error loading chats: ${error.message}"
                     textSize = 16f
                     setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
@@ -1454,13 +1473,16 @@ class MainActivity : AppCompatActivity() {
                 }
                 container.addView(errorText)
             }
-        })
+        )
+
+        Volley.newRequestQueue(this).add(request)
     }
 
     // Update the createChatItemView function to include the last message:
 
     // Function to create a chat item view
     // Modify your createChatItemView function to show online status
+    // Function to create a chat item view
     private fun createChatItemView(chatId: String, username: String, name: String, profilePicUrl: String, lastMessage: String = ""): View {
         // Create a horizontal layout for the chat item
         val itemLayout = LinearLayout(this).apply {
@@ -1587,7 +1609,6 @@ class MainActivity : AppCompatActivity() {
 
         return itemLayout
     }
-    // Function to filter chats by search query
     private fun filterChats(query: String, username: String, container: LinearLayout) {
         // This is a simple client-side filtering
         // For a real app, you might want to do this filtering on the server
